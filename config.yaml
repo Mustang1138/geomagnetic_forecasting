@@ -1,0 +1,63 @@
+# Geomagnetic Forecasting - Project Configuration
+
+# Data sources
+data:
+  sources:
+    # NOAA DSCOVR real-time solar wind data
+    dscovr_base: "https://services.swpc.noaa.gov/json/dscovr/"
+
+    # Kyoto University Dst index
+    kyoto_dst: "https://wdc.kugi.kyoto-u.ac.jp/dst_realtime/"
+
+    # GFZ Potsdam Kp index
+    gfz_kp: "https://kp.gfz-potsdam.de/"
+
+  # Historical data range for analysis
+  date_range:
+    start: "2010-01-01"
+    end: "2025-12-31"
+
+  # Directory paths
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+
+# Model configurations
+models:
+  # Baseline models for comparison
+  baseline:
+    linear_regression:
+      fit_intercept: true
+
+    random_forest:
+      n_estimators: 100
+      max_depth: 10
+      random_state: 42
+
+  # Temporal model (LSTM)
+  lstm:
+    hidden_size: 64
+    num_layers: 2
+    dropout: 0.2
+    sequence_length: 24  # hours of history to use
+
+    # Training hyperparameters
+    epochs: 50
+    batch_size: 32
+    learning_rate: 0.001
+
+# Training configuration
+training:
+  test_split: 0.2       # 20% for testing
+  validation_split: 0.1  # 10% for validation
+  random_seed: 42        # For reproducibility
+
+# Evaluation metrics
+evaluation:
+  metrics:
+    - rmse  # Root Mean Square Error
+    - mae   # Mean Absolute Error
+    - r2    # R-squared correlation
+
+  # Output directories
+  plots_dir: "results/plots"
+  metrics_dir: "results/metrics"

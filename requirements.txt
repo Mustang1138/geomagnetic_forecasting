@@ -1,0 +1,26 @@
+# Core scientific stack
+numpy>=2.4.1
+pandas>=2.3.3
+scipy>=1.17.0
+
+# Machine Learning
+scikit-learn>=1.8.0
+
+# Data visualisation
+matplotlib>=3.10.8
+seaborn>=0.13.2
+
+# Data acquisition
+requests>=2.32.5
+
+# Jupyter (for exploration)
+jupyter>=1.0.0
+ipykernel>=7.1.0
+
+# Utilities
+pyyaml>=6.0.3
+python-dateutil>=2.8.2
+tqdm>=4.67.1
+
+# Development tools
+pytest>=9.0.2
