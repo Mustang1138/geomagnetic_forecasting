@@ -1,146 +1,180 @@
 # Project Progress Notes
+
 ## Week 1 (19–25 January 2026)
 
 ### 🎯 Objectives
-- Set up development environment
-- Create project structure
-- Research data sources
-- Begin data acquisition pipeline
+
+* Set up development environment
+* Create project structure
+* Research suitable geomagnetic and solar wind data sources
+* Implement and validate initial data acquisition pipeline
 
 ---
 
 ### ✅ Completed
-#### Environment Setup
-- ✓ Installed PyCharm (via Toolbox)
-- ✓ Created project with Python 3.13 virtual environment
-- ✓ Initialized Git repository
-- ✓ Installed core dependencies:
-  - NumPy, Pandas, SciPy
-  - scikit-learn
-  - PyTorch (CPU-only)
-  - Matplotlib, Seaborn
-  - Jupyter
 
-#### Project Structure
-- ✓ Created directory hierarchy
-- ✓ Configured `.gitignore` for Python/PyCharm
-- ✓ Created `config.yaml` for parameters
-- ✓ Wrote comprehensive `README.md`
-- ✓ Implemented utility functions (`utils.py`)
+#### Environment Setup
+
+* ✓ Installed PyCharm (via JetBrains Toolbox)
+* ✓ Created project with Python 3.13 virtual environment
+* ✓ Initialised Git repository with appropriate `.gitignore`
+* ✓ Installed core dependencies:
+
+    * NumPy, Pandas, SciPy
+    * scikit-learn
+    * PyTorch (CPU-only)
+    * Matplotlib, Seaborn
+    * Jupyter
+
+#### Project Structure & Configuration
+
+* ✓ Designed and created modular project directory hierarchy
+* ✓ Implemented configuration management via `config.yaml`
+* ✓ Wrote and refined comprehensive `README.md`
+* ✓ Implemented shared helper utilities (`utils.py`) including:
+
+    * Logging setup
+    * Configuration loading
+    * Directory management
+
+#### Data Acquisition & Parsing
+
+* ✓ Implemented `data_loader.py` to manage data acquisition workflow
+* ✓ Integrated historical **OMNI2** hourly solar wind and geomagnetic data (2010–2026)
+* ✓ Implemented fixed-width file parser for OMNI2 annual datasets
+* ✓ Integrated NOAA **DSCOVR** real-time magnetic field and plasma JSON endpoints
+* ✓ Implemented robust missing-value handling using documented OMNI2 fill values
+
+#### Data Validation
+
+* ✓ Implemented schema validation for OMNI2 datasets
+* ✓ Added physical range checks for key parameters (Bz GSM, speed, density, Dst)
+* ✓ Implemented temporal continuity checks for hourly cadence
+* ✓ Performed exploratory statistical validation to confirm physical plausibility
 
 #### Documentation
-- ✓ Project structure documented
-- ✓ Configuration system in place
-- ✓ Progress tracking started
+
+* ✓ Documented data sources and assumptions
+* ✓ Began formal progress tracking for dissertation audit trail
 
 ---
 
 ### 🔄 In Progress
-- Data acquisition scripts (`data_loader.py`)
-- API endpoint research and testing
-- Initial data exploration
+
+* Refinement of OMNI2 parsing and validation logic
+* Initial exploratory data analysis (EDA)
+* Preparation for preprocessing and feature engineering stage
 
 ---
 
 ### 📋 Next Steps
-#### Week 1 Remaining
-1. Research NOAA DSCOVR API documentation
-2. Test API endpoints with sample requests
-3. Implement basic data loader for solar wind data
-4. Download 1-month sample dataset for testing
 
-#### Week 2 Planning
-1. Complete data acquisition for all sources (Dst, Kp)
-2. Implement preprocessing pipeline
-3. Begin exploratory data analysis in Jupyter
-4. Design baseline model architecture
+#### Week 2 Planning (26 January – 1 February 2026)
+
+1. Finalise preprocessing pipeline (`preprocess.py`)
+2. Handle missing data (interpolation vs masking strategy)
+3. Perform exploratory data analysis in Jupyter notebooks
+4. Define baseline forecasting targets (e.g. Dst prediction horizon)
+5. Implement baseline regression models
 
 ---
 
-### 🚧 Blockers/Issues
-- None currently
+### 🚧 Blockers / Issues Encountered
+
+* Initial OMNI2 parsing issues due to incorrect column specifications (resolved)
+* Handling of documented OMNI2 fill values required careful validation (resolved)
 
 ---
 
 ### ❓ Questions for Supervisor (Meeting: 28-01-2026)
-1. **Data Handling:**
-   - Preferred approach for missing/incomplete data points?
-   - Should I interpolate gaps or use forward-fill?
 
-2. **Train/Test Split:**
-   - Recommended split strategy for time-series data?
-   - Use chronological split or random?
+1. **Data Handling**
 
-3. **Preprocessing:**
-   - Any domain-specific normalization requirements for space weather data?
-   - Should features be standardised or min-max scaled?
+    * Preferred strategy for handling missing data in geomagnetic time series?
+    * Acceptability of linear interpolation versus masking missing intervals?
 
-4. **Timeline:**
-   - Target date for baseline model completion?
-   - When should LSTM implementation begin?
+2. **Train/Test Strategy**
 
-5. **Evaluation:**
-   - Any specific performance benchmarks to aim for?
-   - Should I compare against published results?
+    * Recommended temporal split strategy for time-series evaluation?
+    * Suitable validation window size for this dataset?
+
+3. **Preprocessing**
+
+    * Any domain-specific feature transformations recommended?
+    * Preferred normalisation approach for solar wind parameters?
+
+4. **Evaluation**
+
+    * Minimum baseline performance expectations?
+    * Value of comparison with published geomagnetic forecasting benchmarks?
 
 ---
 
 ### ⏱️ Time Tracking
 
-| Activity | Hours |
-|----------|-------|
-| Environment setup & tooling | 2.0 |
-| Project structure & config | 1.5 |
-| Research & planning | 1.5 |
-| Documentation | 1.0 |
-| Utility code implementation | 0.5 |
-| **Week 1 Total** | **6.5** |
+| Activity                          | Hours    |
+|-----------------------------------|----------|
+| Environment setup & tooling       | 2.0      |
+| Project structure & configuration | 1.5      |
+| Data source research              | 2.0      |
+| Data acquisition & parsing        | 4.0      |
+| Utility code implementation       | 1.5      |
+| Validation & debugging            | 2.5      |
+| Documentation                     | 2.0      |
+| **Week 1 Total**                  | **15.5** |
 
 ---
 
 ### 📝 Technical Notes
-#### Data Sources Research
-- **NOAA DSCOVR:**
-  - Provides real-time solar wind measurements
-  - JSON API available
-  - 1-minute cadence data
-  - Parameters: Bz, velocity, density, temperature
 
-- **Kyoto Dst Index:**
-  - Available via text file format
-  - Need to implement parser
-  - Hourly resolution
+#### Data Sources
 
-- **GFZ Kp Index:**
-  - 3-hour resolution
-  - May need interpolation for alignment
+* **OMNI2 (NASA SPDF):**
+
+    * Hourly, near-Earth solar wind and geomagnetic parameters
+    * Used as primary historical dataset
+    * Time span: 2010–2026
+
+* **NOAA DSCOVR:**
+
+    * Near-real-time solar wind magnetic field and plasma measurements
+    * JSON API
+    * Used for methodological comparison (not real-time forecasting)
 
 #### Technology Decisions
-- **Python 3.13:** Latest stable release, good performance
-- **PyTorch (CPU):** More flexible than Keras, sufficient for project scale
-- **YAML config:** Easy to modify parameters without code changes
-- **Jupyter:** Essential for exploratory analysis
+
+* **Python 3.13:** Modern language features and performance
+* **PyTorch (CPU-only):** Sufficient for dataset scale, avoids GPU dependency
+* **Configuration-driven design:** Supports reproducibility and experimentation
+* **Jupyter Notebooks:** Used for EDA and visual validation
 
 #### Risk Assessment
-- **Low:** Environment setup - COMPLETED
-- **Medium:** Data availability/API reliability - MONITORING
-- **Low:** Model implementation - standard architectures
-- **Low:** Timeline - sufficient buffer built in
+
+* **Low:** Environment and tooling (completed)
+* **Low:** Data availability (historical OMNI2 is stable)
+* **Medium:** Model performance uncertainty (inherent to research question)
+* **Low:** Project timeline (buffer available)
 
 ---
 
 ### 🎓 Learning & Insights
-- Git workflow refresher valuable
-- PyTorch CPU-only installation much cleaner than CUDA version
-- Configuration-driven approach will make experimentation easier
-- Good project structure upfront saves time later
+
+* Early focus on data validation prevents downstream modelling issues
+* OMNI2 fixed-width parsing requires strict adherence to documentation
+* Configuration-driven pipelines improve reproducibility
+* Clear separation of data acquisition, validation, and modelling is beneficial
 
 ---
+
 ## Week 2 (26 January – 1 February 2026)
+
 ### 🎯 Objectives
-*To be filled in*
+
+* Implement preprocessing and feature engineering pipeline
+* Conduct exploratory data analysis
+* Define forecasting targets and baselines
 
 ---
 
-*Last Updated: 19-01-2026*
+*Last Updated: 25-01-2026*
 *Next Review: 28-01-2026*

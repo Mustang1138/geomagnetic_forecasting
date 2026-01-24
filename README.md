@@ -1,7 +1,7 @@
-# Geomagnetic Forecasting - ML Evaluation Project
+# Geomagnetic Forecasting – Machine Learning Evaluation Project
 
-**An offline proof-of-concept investigating whether temporal ML models outperform baseline methods for geomagnetic 
-activity prediction.**
+**An offline, research-focused proof-of-concept evaluating whether temporal machine learning models outperform classical
+baselines for geomagnetic activity forecasting.**
 
 ---
 
@@ -17,21 +17,35 @@ activity prediction.**
 
 ## 🎯 Project Aim
 
-To investigate whether machine learning-based temporal modelling approaches can provide better predictive performance 
-for geomagnetic forecasting compared to established baseline methods, and to develop and evaluate a suitable forecasting
-model using historical space-weather data.
+The primary aim of this project is to evaluate whether machine learning–based temporal models can improve predictive
+performance for geomagnetic activity forecasting when compared with established baseline methods.
+
+Specifically, the project:
+
+- Develops a reproducible offline forecasting pipeline
+- Compares baseline statistical and ensemble models against temporal deep learning approaches
+- Evaluates predictive performance using standard regression metrics on historical space‑weather data
 
 ---
 
 ## 📊 Project Scope
 
-This is an **offline, proof-of-concept** evaluation project:
-- ✅ Historical data analysis (2010-2025)
-- ✅ Model comparison (baseline vs temporal)
-- ✅ Performance evaluation
-- ❌ No real-time deployment
-- ❌ Not production-ready system
-- ❌ No live API integration
+This project is intentionally scoped as an **offline, proof‑of‑concept research study.**
+
+### Included
+
+- ✅ Historical data analysis (2010-2026)
+- ✅ Data ingestion, validation, and preprocessing
+- ✅ Feature engineering for time‑series modelling
+- ✅ Baseline vs temporal model comparison
+- ✅ Quantitative performance evaluation
+
+### Excluded
+
+- ❌ Real‑time or operational forecasting
+- ❌ Production‑ready deployment
+- ❌ Live API services or dashboards
+- ❌ Space‑weather alerting systems
 
 ---
 
@@ -40,76 +54,93 @@ This is an **offline, proof-of-concept** evaluation project:
 geomagnetic_forecasting/
 │
 ├── data/
-│   ├── raw/                # Raw data from APIs
-│   └── processed/          # Cleaned, preprocessed datasets
+│   ├── raw/                # Raw downloaded datasets (OMNI2, DSCOVR)
+│   └── processed/          # Cleaned and feature-engineered datasets
 │
 ├── src/
-│   ├── data_loader.py      # Data acquisition from APIs
-│   ├── preprocess.py       # Data cleaning & feature engineering
-│   ├── baseline_models.py  # Linear Regression, Random Forest
-│   ├── temporal_model.py   # LSTM implementation
+│   ├── data_loader.py      # Data acquisition and consolidation
+│   ├── parsers.py          # OMNI2 and DSCOVR parsing utilities
+│   ├── validators.py       # Schema, continuity, and physical validation
+│   ├── preprocess.py       # Cleaning and feature engineering
+│   ├── baseline_models.py  # Linear regression and ensemble baselines
+│   ├── temporal_model.py   # LSTM-based temporal model
 │   ├── train.py            # Model training pipeline
-│   ├── evaluate.py         # Performance metrics & comparison
-│   └── utils.py            # Helper functions
+│   ├── evaluate.py         # Metric calculation and comparison
+│   └── utils.py            # Logging and helper utilities
 │
 ├── results/
-│   ├── plots/              # Visualisations
-│   └── metrics/            # Performance metrics (CSV)
+│   ├── plots/              # Evaluation visualisations
+│   └── metrics/            # Model performance metrics (CSV)
 │
-├── notebooks/              # Jupyter notebooks for exploration
-├── docs/                   # Progress notes & documentation
+├── notebooks/              # Exploratory analysis notebooks
+├── docs/                   # Project documentation and progress logs
 │
-├── config.yaml             # Configuration parameters
+├── config.yaml             # Centralised configuration
 ├── requirements.txt        # Python dependencies
-└── README.md               # This file
+└── README.md               # Project overview
 ```
 
 ---
 
 ## 📡 Data Sources
 
-| Source | Data Type | Provider |
-|--------|-----------|----------|
-| Solar Wind Parameters | Velocity, Density, Temperature | NOAA DSCOVR |
-| Dst Index | Geomagnetic disturbance | Kyoto University WDC |
-| Kp Index | Planetary geomagnetic activity | GFZ Potsdam |
+| Dataset    | Parameters                                    | Provider            |
+|------------|-----------------------------------------------|---------------------|
+| **OMNI2**  | IMF Bz (GSM), solar wind speed & density, Dst | NASA SPDF / OMNIWeb |
+| **DSCOVR** | Near‑real‑time magnetic field & plasma        | NOAA SWPC           |
 
-All data sources are publicly available and documented.
+### Notes on Data Handling
+
+* OMNI2 hourly data are used as the primary historical dataset
+* Fill values are replaced with NaN according to official documentation
+* Physical plausibility checks are applied during validation
+* All analysis is performed offline
 
 ---
 
 ## 🤖 Models
 
-### Baseline Models (Benchmarks)
-- **Linear Regression**         - Simple linear relationship
-- **Random Forest Regressor**   - Non-linear ensemble method
+### Baseline Models
+
+Used as benchmarking references:
+
+* **Linear Regression** – Simple linear predictor
+* **Random Forest Regressor** – Non‑linear ensemble baseline
 
 ### Temporal Model
-- **LSTM** (Long Short-Term Memory) - Captures time-series dependencies
+
+* **LSTM (Long Short‑Term Memory)** – Deep learning model designed to capture temporal dependencies in geomagnetic time
+  series
 
 ---
 
 ## 📈 Evaluation Metrics
-- **RMSE** (Root Mean Square Error) - Overall prediction accuracy
-- **MAE** (Mean Absolute Error) - Average prediction error
-- **R²** (Coefficient of Determination) - Model fit quality
 
-Visual comparisons via time-series plots.
+Models are evaluated using standard regression metrics:
+
+* **RMSE** – Root Mean Square Error
+* **MAE** – Mean Absolute Error
+* **R²** – Coefficient of Determination
+
+Qualitative assessment is supported via time‑series visualisations of predictions versus observations.
 
 ---
 
 ## 🛠️ Installation
+
 ### Requirements
-- Python 3.13
-- pip (package manager)
+
+* Python **3.13**
+* pip
 
 ### Setup
+
 ```bash
 # Clone repository
 git clone https://github.com/Mustang1138/geomagnetic_forecasting.git
 cd geomagnetic_forecasting
 
-# Create virtual environment
+# Create and activate virtual environment
 python3.13 -m venv venv
 source venv/bin/activate  # Linux/macOS
 
@@ -123,39 +154,60 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 ---
 
 ## 🚀 Usage
-*To be completed as development progresses*
+
+Example end‑to‑end workflow:
+
 ```bash
-# Example workflow (future):
-# 1. Acquire data
-python src/data_loader.py
+# 1. Download and parse raw datasets
+python -m src.data_loader
 
-# 2. Preprocess
-python src/preprocess.py
+# 2. Preprocess and engineer features
+python -m src.preprocess
 
-# 3. Train models
-python src/train.py
+# 3. Train baseline and temporal models
+python -m src.train
 
-# 4. Evaluate
-python src/evaluate.py
+# 4. Evaluate and compare performance
+python -m src.evaluate
 ```
 
 ---
 
+## 🧪 Data Validation
+
+Automated validation checks include:
+
+* Schema verification
+* Missing data analysis
+* Hourly time‑continuity checks
+* Physical plausibility bounds for solar wind and geomagnetic parameters
+
+These checks ensure scientific consistency prior to modelling.
+
+---
+
 ## 📝 Progress Tracking
-See `docs/progress_notes.md` for detailed weekly updates and development log.
+
+Development progress, design decisions, and weekly milestones are documented in:
+
+```
+docs/progress_notes.md
+```
 
 ---
 
-## 📄 License
-MIT License - Academic project for Edge Hill University
+## 📄 Licence
+
+MIT Licence — Academic research project for Edge Hill University.
 
 ---
 
-## 🙏 Acknowledgments
-- Prof. Ella Pereira (Project Supervisor)
-- NOAA Space Weather Prediction Center
-- Kyoto University World Data Center
-- GFZ Potsdam University
+## 🙏 Acknowledgements
+
+* Prof. Ella Pereira (Project Supervisor)
+* NASA Space Physics Data Facility (SPDF)
+* NOAA Space Weather Prediction Center
 
 ---
-*Last Updated: January 2026*
+
+*Last updated: January 2026*
