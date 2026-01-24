@@ -1,30 +1,52 @@
-# Geomagnetic Forecasting - Project Configuration
+# Centralised configuration file for geomagnetic storm forecasting experiments.
+# Externalising parameters improves reproducibility and experiment traceability,
+# which is a key requirement in applied machine learning systems
+# (Lwakatare et al., 2020; Martin, 2008).
 
-# Data sources
 data:
-  sources:
-    # NOAA DSCOVR real-time solar wind data
-    dscovr_base: "https://services.swpc.noaa.gov/json/dscovr/"
-
-    # Kyoto University Dst index
-    kyoto_dst: "https://wdc.kugi.kyoto-u.ac.jp/dst_realtime/"
-
-    # GFZ Potsdam Kp index
-    gfz_kp: "https://kp.gfz-potsdam.de/"
-
-  # Historical data range for analysis
   date_range:
+    # Defines the temporal coverage of the historical OMNI2 dataset.
+    # Long temporal baselines are recommended for geomagnetic modelling
+    # to capture multiple solar cycles (Papitashvili and King, 2020).
     start: "2010-01-01"
-    end: "2025-12-31"
+    end: "2026-01-23"
 
-  # Directory paths
+  # Raw and processed directories are configurable to avoid hard-coded paths,
+  # supporting portability across environments (PEP 8, 2001).
   raw_dir: "data/raw"
   processed_dir: "data/processed"
 
+  urls:
+    dscovr:
+      # Real-time DSCOVR solar wind data is used for exploratory analysis only,
+      # as real-time streams are noisier and less stable than curated datasets
+      # (NOAA SWPC, 2024; Cristoforetti et al., 2022).
+      mag: "https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json"
+      plasma: "https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json"
+
+    omni2:
+      # OMNI2 provides long-term, hourly-averaged solar wind and geomagnetic data,
+      # widely used in space weather research (Papitashvili and King,
+      # 2005).
+      base_url: "https://spdf.gsfc.nasa.gov/pub/data/omni/low_res_omni/"
+      filename_pattern: "omni2_{year}.dat"
+
+  omni2:
+    provider: "NASA SPDF"
+    cadence: "hourly"
+    format: "fixed-width ASCII"
+    start_year: 1963
+
+  dscovr:
+    provider: "NOAA SWPC"
+    window_days: 7
+    usage: "exploration_only"
+
 # Model configurations
 models:
-  # Baseline models for comparison
   baseline:
+    # Baseline models are included to contextualise performance gains
+    # from more complex methods (Breiman, 2001).
     linear_regression:
       fit_intercept: true
 
@@ -33,31 +55,30 @@ models:
       max_depth: 10
       random_state: 42
 
-  # Temporal model (LSTM)
   lstm:
+    # LSTM architecture parameters follow established practice
+    # for temporal dependency modelling in geomagnetic forecasting
+    # (Hochreiter and Schmidhuber, 1997; Zou et al., 2024).
     hidden_size: 64
     num_layers: 2
     dropout: 0.2
-    sequence_length: 24  # hours of history to use
-
-    # Training hyperparameters
+    sequence_length: 24
     epochs: 50
     batch_size: 32
     learning_rate: 0.001
 
 # Training configuration
 training:
-  test_split: 0.2       # 20% for testing
-  validation_split: 0.1  # 10% for validation
-  random_seed: 42        # For reproducibility
+  test_split: 0.2
+  validation_split: 0.1
+  random_seed: 42
 
-# Evaluation metrics
+# Evaluation configuration
 evaluation:
   metrics:
-    - rmse  # Root Mean Square Error
-    - mae   # Mean Absolute Error
-    - r2    # R-squared correlation
+    - rmse
+    - mae
+    - r2
 
-  # Output directories
   plots_dir: "results/plots"
   metrics_dir: "results/metrics"

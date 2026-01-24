@@ -5,8 +5,10 @@
 ### Primary Data Sources
 
 **NASA OMNI Dataset**
-- PAPITASHVILI, N. E. and KING, J. H., 2020. *OMNI Hourly Data* [online]. Available from: 
-https://doi.org/10.48322/1shr-ht18 [Accessed 7 January 2026].
+
+- PAPITASHVILI, N. E. and KING, J. H., 2020. *OMNI Hourly Data* [Data set].
+  NASA Space Physics Data Facility. Available from:
+  https://doi.org/10.48322/1shr-ht18 [Accessed 7 January 2026].
 
 - PAPITASHVILI, N. E. and KING, J. H., 2005. Solar wind spatial scales in and comparisons of hourly Wind and ACE plasma 
 and magnetic field data. *Journal of Geophysical Research* [online]. 110 (A2), p. A02104. Available from: 
@@ -25,14 +27,6 @@ https://doi.org/10.1029/2004JA010649 [Accessed 7 January 2026].
 - BURT, J. and SMITH, B., 2012. Deep Space Climate Observatory: The DSCOVR mission. In: *2012 IEEE Aerospace 
 Conference*, 3-10 March 2012, Big Sky, MT, USA [online]. IEEE, pp. 1–13. Available from: 
 https://doi.org/10.1109/AERO.2012.6187025 [Accessed 8th January 2026].
-
-**Kyoto University World Data Center**
-- KYOTO UNIVERSITY, 2024. *Geomagnetic Data Service* [online]. Available from: http://wdc.kugi.kyoto-u.ac.jp/ 
-[Accessed 8 January 2026].
-
-**GFZ Potsdam**
-- GEOFORSCHUNGSZENTRUM HELMHOLTZ CENTRE FOR GEOSCIENCES, 2024. *Kp Index Data* [online]. Available from: 
-https://kp.gfz-potsdam.de/ [Accessed 8 January 2026].
 
 ---
 
@@ -125,8 +119,8 @@ Index Prediction. *ArXiv preprint arXiv:2205.02447*. Available from: https://doi
 [Accessed 7 November 2025].
 
 - ZOU, Z., HUANG, H., ZUO, P., NI, B., SAN, W., YUAN, Q., HU, J. and WEI, J., 2024. A forecast model of geomagnetic 
-indices from the solar wind fluids observations based on long short-term memory neural network. *Physics of Fluids*, 
-36(2), p. 026616. Available from: https://doi.org/10.1063/5.0196284 [Accessed 6 November 2026].
+indices from the solar wind fluids observations based on long short-term memory neural network. *Physics of Fluids*,
+  36(2), p. 026616. Available from: https://doi.org/10.1063/5.0196284 [Accessed 6 November 2025].
 
 **Machine Learning for Geomagnetic Forecasting**
 - BALAJI, S.R.A., and RANGANATHAN, P., 2024. Geomagnetic Storm Forecasting Using Machine Learning Models. *IEEE 14th 
@@ -142,13 +136,13 @@ WINDISCH, A., 2022. Predicting the Bz magnetic field component from upstream in 
 ejections using machine learning. *EGU General Assembly 2022*, 23-27 May 2022, Vienna, Austria: EGU22: pp. 1-9.
 
 - TASISTRO-HART, A., GRAYVER, A. and KUVSHINOV, A., 2021. Probabilistic Geomagnetic Storm Forecasting via Deep Learning. 
-*Journal of Geophysical Research: Space Physics*, 126(1), e2020JA028228. Available from: 
-https://doi.org/10.1029/2020JA028228 [Accessed 5 November 2026].
+*Journal of Geophysical Research: Space Physics*, 126(1), e2020JA028228. Available from:
+  https://doi.org/10.1029/2020JA028228 [Accessed 5 November 2025].
 
 **Data Preprocessing Challenges**
 - CRISTOFORETTI, M., BATTISTON, R., GOBBI, A., LUPPA, R. and PIERSANTI, M., 2022. Prominence of the training data 
-preparation in geomagnetic storm prediction using deep neural networks. *Scientific Reports*, 12, p. 7631. 
-Available from: https://doi.org/10.1038/s41598-022-11721-8 [Accessed 6 November 2026].
+preparation in geomagnetic storm prediction using deep neural networks. *Scientific Reports*, 12, p. 7631.
+  Available from: https://doi.org/10.1038/s41598-022-11721-8 [Accessed 6 November 2025].
 
 **Background on Geomagnetic Storms**
 - YAN, I., WANG, X., LUO, B., ZHAO, X. and ZHANG, Z., 2024. Early Prediction of Geomagnetic Storms by Machine Learning 
