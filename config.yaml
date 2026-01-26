@@ -69,9 +69,16 @@ models:
 
 # Training configuration
 training:
-  test_split: 0.2
-  validation_split: 0.1
-  random_seed: 42
+  test_split: 0.15
+  validation_split: 0.15
+  random_seed: 42  # Used for model reproducibility (not for time splits)
+
+# Data physical limits
+physical_limits:
+  bz_gsm: [ -50, 50 ]  # nT - IMF Bz component
+  speed: [ 200, 1200 ]  # km/s - Solar wind speed
+  density: [ 0.1, 200 ]  # n/cc - Proton density
+  dst: [ -500, 100 ]  # nT - Dst index
 
 # Evaluation configuration
 evaluation:

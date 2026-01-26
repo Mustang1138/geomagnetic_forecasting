@@ -2,9 +2,12 @@
 Data validation utilities for geomagnetic forecasting project.
 """
 
+import logging
 from typing import Dict, Any
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # Expected schema for OMNI2 data after parsing.
 # Explicit schema validation ensures consistency between experiments
@@ -16,6 +19,11 @@ REQUIRED_COLUMNS = {"datetime", "bz_gsm", "speed", "density", "dst"}
 # Values outside these ranges typically indicate sensor errors,
 # data corruption, or upstream processing artefacts rather than
 # true physical extremes (Liemohn et al., 2021).
+
+# NOTE:
+# These limits are intentionally broader than those used in preprocessing.
+# Validators report potential anomalies; preprocessing applies stricter,
+# experiment-specific bounds defined in config.yaml.
 PHYSICAL_LIMITS = {
     "bz_gsm": (-100.0, 100.0),  # nT
     "speed": (200.0, 2000.0),  # km/s
@@ -66,8 +74,10 @@ def check_date_continuity(df: pd.DataFrame) -> Dict[str, Any]:
     df_sorted = df.sort_values("datetime")
     deltas = df_sorted["datetime"].diff().dropna()
 
-    # Convert timedelta → hours (safe, pandas-supported)
-    hours = deltas.dt.total_seconds() / 3600.0
+    hours = pd.Series(
+        deltas.dt.total_seconds() / 3600.0,
+        index=deltas.index,
+    )
 
     gaps = hours[hours > 1.0]
 
@@ -112,3 +122,55 @@ def validate_omni_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
         "date_continuity": check_date_continuity(df),
         "physical_outliers": check_physical_outliers(df),
     }
+
+
+def validate_preprocessed_data(summary: Dict[str, Any]) -> None:
+    """
+    Validate preprocessed data meets minimum requirements for ML training.
+
+    Enforcing minimum dataset sizes reduces the risk of unstable training
+    dynamics and unreliable evaluation metrics
+    (Breiman, 2001; Liemohn et al., 2021).
+    """
+
+    # Minimum sample requirements for reliable ML training
+    MIN_TRAIN_SAMPLES = 1000
+    MIN_VAL_SAMPLES = 200
+    MIN_TEST_SAMPLES = 200
+
+    required_keys = {
+        "train_samples",
+        "val_samples",
+        "test_samples",
+        "sequence_length",
+        "n_features",
+        "feature_names",
+        "target_name",
+    }
+
+    missing = required_keys - summary.keys()
+    if missing:
+        raise ValueError(f"Preprocessing summary missing keys: {missing}")
+
+    if summary["train_samples"] < MIN_TRAIN_SAMPLES:
+        raise ValueError(
+            f"Insufficient training samples: {summary['train_samples']}"
+        )
+
+    if summary["val_samples"] < MIN_VAL_SAMPLES:
+        raise ValueError(
+            f"Insufficient validation samples: {summary['val_samples']}"
+        )
+
+    if summary["test_samples"] < MIN_TEST_SAMPLES:
+        raise ValueError(
+            f"Insufficient test samples: {summary['test_samples']}"
+        )
+
+    if summary["sequence_length"] <= 0:
+        raise ValueError("Sequence length must be > 0")
+
+    if summary["n_features"] != len(summary["feature_names"]):
+        raise ValueError("Feature count mismatch")
+
+    logger.info("✓ Preprocessed data validation passed")

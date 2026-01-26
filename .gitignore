@@ -1,5 +1,7 @@
 # Python
 __pycache__/
+*.pyc
+*.pyo
 *.py[cod]
 *$py.class
 *.so
@@ -36,7 +38,8 @@ results/metrics/*
 Thumbs.db
 .directory
 
-# Models
+# Models / artefacts
+*.npy
 *.pth
 *.pkl
 *.h5
@@ -46,6 +49,9 @@ checkpoints/
 # Logs
 *.log
 logs/
+
+# Pytest
+.pytest_cache/
 
 # Temporary files
 *.tmp
