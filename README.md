@@ -58,6 +58,7 @@ geomagnetic_forecasting/
 │   └── processed/          # Cleaned and feature-engineered datasets
 │
 ├── src/
+│   ├── __init__.py         # Package marker for src module
 │   ├── data_loader.py      # Data acquisition and consolidation
 │   ├── parsers.py          # OMNI2 and DSCOVR parsing utilities
 │   ├── validators.py       # Schema, continuity, and physical validation
@@ -71,6 +72,10 @@ geomagnetic_forecasting/
 ├── results/
 │   ├── plots/              # Evaluation visualisations
 │   └── metrics/            # Model performance metrics (CSV)
+│
+├── tests/                  # Unit tests for preprocessing and validation
+│   ├── test_preprocess.py
+│   └── test_validators.py
 │
 ├── notebooks/              # Exploratory analysis notebooks
 ├── docs/                   # Project documentation and progress logs
@@ -101,6 +106,8 @@ geomagnetic_forecasting/
 ## 🤖 Models
 
 ### Baseline Models
+
+Baseline models are intentionally not exhaustively tuned and are used to establish lower-bound reference performance.
 
 Used as benchmarking references:
 
@@ -183,6 +190,20 @@ Automated validation checks include:
 * Physical plausibility bounds for solar wind and geomagnetic parameters
 
 These checks ensure scientific consistency prior to modelling.
+
+---
+
+## 🧪 Testing
+
+Automated tests are implemented to ensure correctness and reproducibility:
+
+* Preprocessing pipeline output shapes and sequence construction
+* Validation logic for schema, continuity, and physical constraints
+* Minimum dataset size checks for model training
+
+Tests are written using `pytest` and are designed to catch silent
+data leakage, shape mismatches, and invalid preprocessing outputs
+before model training.
 
 ---
 

@@ -174,7 +174,44 @@
 * Conduct exploratory data analysis
 * Define forecasting targets and baselines
 
+#### Data Preprocessing
+
+* ✓ Implemented unified preprocessing pipeline (`preprocess.py`)
+* ✓ Enforced chronological train/validation/test splits (no leakage)
+* ✓ Implemented forward/backward filling for missing values
+* ✓ Applied physically motivated outlier filtering via `config.yaml`
+* ✓ Standardised features and target using training data only
+* ✓ Generated both:
+    * Tabular datasets for baseline models
+    * Fixed-length sequences for LSTM models
+* ✓ Persisted fitted scalers for inverse transformation during evaluation
+
+#### Baseline Models
+
+* ✓ Implemented Linear Regression baseline
+* ✓ Implemented Random Forest Regressor baseline
+* ✓ Trained models using frozen, preprocessed datasets
+* ✓ Saved trained models and predictions for train/validation/test splits
+* ✓ Centralised baseline hyperparameters in `config.yaml`
+
+#### Testing & Validation
+
+* ✓ Added unit tests for preprocessing pipeline
+* ✓ Added unit tests for data validation utilities
+* ✓ Validated sequence shapes and minimum sample requirements
+* ✓ Ensured preprocessing outputs meet ML training constraints
+
 ---
 
-*Last Updated: 25-01-2026*
+### 📋 Next Steps
+
+1. Implement evaluation and metric calculation pipeline
+2. Compute RMSE, MAE, and R² for baseline models
+3. Generate comparative plots for baseline performance
+4. Implement LSTM temporal model
+5. Compare baseline vs temporal model results
+
+---
+
+*Last Updated: 26-01-2026*
 *Next Review: 28-01-2026*
