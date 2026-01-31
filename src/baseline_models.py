@@ -1,24 +1,19 @@
 """
-Baseline machine learning models for geomagnetic forecasting.
+Baseline regression models for geomagnetic storm severity forecasting.
 
-Implements classical, non-temporal models to establish reference
-performance against which more complex temporal models (e.g. LSTM)
-are compared.
-
-Models implemented:
-- Linear Regression
-- Random Forest Regressor
+This module implements conservative, non-temporal machine learning
+baselines trained to predict the Storm Severity Index (SSI).
 
 Design principles:
-- Consume frozen, preprocessed baseline datasets
-- No additional data cleaning or scaling
-- Deterministic configuration via config.yaml
-- Predictions saved in physical units (nT)
+- No additional preprocessing beyond frozen pipeline outputs
+- Fixed, interpretable model configurations
+- Regression-first (continuous severity prediction)
+- Fully reproducible and comparable with temporal models
 
 References:
-- Breiman (2001)
-- Pedregosa et al. (2011)
-- Liemohn et al. (2021)
+- Breiman (2001) - Random Forest methodology
+- Pedregosa et al. (2011) - scikit-learn implementation
+- Liemohn et al. (2021) - Evaluation metrics for magnetospheric physics
 """
 
 import pickle
@@ -29,6 +24,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from src.utils import load_config, ensure_dir, setup_logging
 
@@ -37,169 +33,283 @@ logger = setup_logging()
 
 class BaselineTrainer:
     """
-    Train and evaluate baseline regression models using
-    preprocessed tabular datasets.
+    Train and evaluate baseline regression models on SSI.
+
+    This class implements two baseline models:
+    1. Linear Regression - provides a simple, interpretable baseline
+    2. Random Forest - captures non-linear relationships whilst remaining interpretable
+
+    The baseline models serve as benchmarks against which more complex temporal
+    models (e.g., LSTMs) can be compared, following best practices for time series
+    model evaluation (Cerqueira et al., 2020).
     """
 
+    # Feature columns used for prediction
+    # These correspond to key solar wind parameters that drive geomagnetic activity
+    # (Burton et al., 1975; Gonzalez et al., 1994)
+    FEATURE_COLS = ["bz_gsm", "speed", "density"]
+
+    # Target variable: continuous Storm Severity Index in [0, 1]
+    TARGET_COL = "storm_severity_index"
+
     def __init__(self, config_path: str = "config.yaml"):
+        """
+        Initialise the baseline trainer with model configurations.
+
+        Parameters
+        ----------
+        config_path : str, optional
+            Path to YAML configuration file containing hyperparameters.
+            Default is "config.yaml".
+
+        Notes
+        -----
+        Model hyperparameters are intentionally fixed (not tuned) to ensure
+        reproducibility and fair comparison. This follows recommendations from
+        Liemohn et al. (2021) for robust magnetospheric physics model comparisons.
+        """
         self.config = load_config(config_path)
 
-        # Feature/target definitions are fixed to match preprocessing output
-        # and established geomagnetic forecasting literature
-        # (Abduallah et al., 2022; Zou et al., 2024).
-        self.feature_cols = ["bz_gsm", "speed", "density"]
-        self.target_col = "dst"
+        # Extract Random Forest configuration from config file
+        rf_cfg = self.config["models"]["baseline"]["random_forest"]
 
-        self.output_dir = Path("results/baselines")
-        ensure_dir(self.output_dir)
+        # Initialise models with fixed hyperparameters
+        self.models = {
+            # Linear Regression: ordinary least squares regression
+            # Provides an interpretable baseline and tests the linear hypothesis
+            # (Pedregosa et al., 2011)
+            "linear_regression": LinearRegression(
+                fit_intercept=self.config["models"]["baseline"]["linear_regression"].get(
+                    "fit_intercept",
+                    True)),
+
+            # Random Forest: ensemble of decision trees
+            # Captures non-linear relationships whilst maintaining interpretability
+            # through feature importance (Breiman, 2001)
+            "random_forest": RandomForestRegressor(
+                n_estimators=rf_cfg["n_estimators"],  # Number of trees in the forest
+                max_depth=rf_cfg["max_depth"],  # Maximum tree depth (prevents overfitting)
+                random_state=self.config["training"]["random_seed"],  # Ensures reproducibility
+                n_jobs=-1,  # Use all available CPU cores for parallel training
+            ),
+        }
 
     # Data loading
 
-    def _load_split(self, name: str) -> tuple[np.ndarray, np.ndarray]:
+    def _load_split(self, path: Path):
         """
-        Load a preprocessed baseline split from disk.
+        Load a preprocessed data split from CSV.
 
-        Parameters:
-        name : str
-            One of {'train', 'val', 'test'}.
+        Parameters
+        ----------
+        path : Path
+            Path to the CSV file containing preprocessed data.
 
-        Returns:
+        Returns
+        -------
         X : np.ndarray
-            Feature matrix.
+            Feature matrix of shape (n_samples, n_features).
         y : np.ndarray
-            Target vector (2D, shape: [n_samples, 1]).
+            Target vector of shape (n_samples,).
+
+        Notes
+        -----
+        This method expects data that has already been cleaned, scaled, and
+        split by the preprocessing pipeline to prevent any data leakage
+        (Cerqueira et al., 2020).
         """
-        processed_dir = Path(self.config["data"]["processed_dir"])
-        path = processed_dir / f"{name}_baseline.csv"
-
-        if not path.exists():
-            raise FileNotFoundError(f"Missing baseline dataset: {path}")
-
         df = pd.read_csv(path)
 
-        missing = set(self.feature_cols + [self.target_col]) - set(df.columns)
-        if missing:
-            raise ValueError(f"{path.name} missing columns: {missing}")
+        # Extract feature matrix
+        # Features are already scaled by the preprocessing pipeline
+        X = df[self.FEATURE_COLS].values
 
-        X = df[self.feature_cols].values
-        y = df[self.target_col].values.reshape(-1, 1)
+        # Extract target vector
+        y = df[self.TARGET_COL].values
 
         return X, y
 
-    @staticmethod
-    def _fit_and_predict(
-            model,
-            X_train: np.ndarray,
-            y_train: np.ndarray,
-            X_val: np.ndarray,
-            X_test: np.ndarray,
-    ) -> Dict[str, np.ndarray]:
-        """
-        Fit a regression model and generate predictions for all data splits.
+    # Evaluation
 
-        Targets are flattened for compatibility with scikit-learn estimators,
-        and predictions are reshaped to (n_samples, 1) to enforce a consistent
-        output interface across baseline models.
+    @staticmethod
+    def _evaluate(y_true, y_pred) -> Dict[str, float]:
         """
-        model.fit(X_train, y_train.ravel())
+        Compute regression evaluation metrics.
+
+        Parameters
+        ----------
+        y_true : array-like
+            Ground truth target values.
+        y_pred : array-like
+            Predicted target values.
+
+        Returns
+        -------
+        dict
+            Dictionary containing evaluation metrics:
+            - rmse: Root Mean Squared Error
+            - mae: Mean Absolute Error
+            - r2: Coefficient of determination
+
+        Notes
+        -----
+        RMSE is the primary metric as recommended by Liemohn et al. (2021)
+        for magnetospheric physics model evaluation. MAE provides additional
+        insight into average prediction error, whilst R² indicates the proportion
+        of variance explained by the model.
+        """
+        # Mean Squared Error
+        mse = mean_squared_error(y_true, y_pred)
+
+        # Root Mean Squared Error (primary metric)
+        # RMSE penalises large errors more heavily than MAE, which is important
+        # for geomagnetic storm forecasting where extreme events matter most
+        # (Liemohn et al., 2021)
+        rmse = float(np.sqrt(mse))
 
         return {
-            "train": model.predict(X_train).reshape(-1, 1),
-            "val": model.predict(X_val).reshape(-1, 1),
-            "test": model.predict(X_test).reshape(-1, 1),
+            "rmse": rmse,  # Root Mean Squared Error
+            "mae": mean_absolute_error(y_true, y_pred),  # Mean Absolute Error
+            "r2": r2_score(y_true, y_pred),  # R-squared (coefficient of determination)
         }
 
-    # Models
-
-    def train_linear_regression(self) -> Dict[str, np.ndarray]:
-        """
-        Train ordinary least squares linear regression.
-
-        Used as a simple, interpretable baseline
-        (Pedregosa et al., 2011).
-        """
-        logger.info("Training Linear Regression")
-
-        X_train, y_train = self._load_split("train")
-
-        # Validation data is loaded for pipeline consistency and
-        # comparability with later temporal models. No hyperparameter
-        # tuning is performed for baseline models by design.
-        X_val, y_val = self._load_split("val")
-
-        X_test, y_test = self._load_split("test")
-
-        model = LinearRegression()
-        preds = self._fit_and_predict(
-            model,
-            X_train,
-            y_train,
-            X_val,
-            X_test,
-        )
-
-        self._save_outputs("linear_regression", model, preds)
-        return preds
-
-    def train_random_forest(self) -> Dict[str, np.ndarray]:
-        """
-        Train Random Forest regressor using fixed hyperparameters.
-
-        The model is intentionally not exhaustively tuned, as it serves
-        as a classical ML baseline rather than an optimised predictor
-        (Breiman, 2001).
-        """
-        cfg = self.config["models"]["baseline"]["random_forest"]
-
-        logger.info("Training Random Forest")
-
-        X_train, y_train = self._load_split("train")
-
-        # Validation data is loaded for consistency and future extensibility;
-        # no hyperparameter tuning is performed for baseline models.
-        X_val, y_val = self._load_split("val")
-
-        X_test, y_test = self._load_split("test")
-
-        model = RandomForestRegressor(
-            n_estimators=cfg["n_estimators"],
-            max_depth=cfg["max_depth"],
-            random_state=cfg["random_state"],
-            n_jobs=-1,
-        )
-
-        preds = self._fit_and_predict(
-            model,
-            X_train,
-            y_train,
-            X_val,
-            X_test,
-        )
-
-        self._save_outputs("random_forest", model, preds)
-        return preds
-
-    # Persistence
-
-    def _save_outputs(
+    def run(
             self,
-            name: str,
-            model,
-            preds: Dict[str, np.ndarray],
-    ) -> None:
-        model_dir = self.output_dir / name
-        ensure_dir(model_dir)
+            processed_dir: str = "data/processed",
+            output_dir: str = "results/baselines",
+    ) -> Dict[str, Dict[str, float]]:
+        """
+        Execute the complete baseline model training and evaluation pipeline.
 
-        with open(model_dir / "model.pkl", "wb") as f:
-            pickle.dump(model, f)
+        This method:
+        1. Loads preprocessed training and test data
+        2. Trains each baseline model
+        3. Generates predictions on the test set
+        4. Computes evaluation metrics
+        5. Persists trained models and predictions
 
-        for split, arr in preds.items():
-            np.save(model_dir / f"y_pred_{split}.npy", arr)
+        Parameters
+        ----------
+        processed_dir : str, optional
+            Directory containing preprocessed CSV files.
+            Default is "data/processed".
+        output_dir : str, optional
+            Directory for saving trained models, predictions, and results.
+            Default is "results/baselines".
 
-        logger.info(f"Saved outputs for {name}")
+        Returns
+        -------
+        dict
+            Nested dictionary mapping model names to their evaluation metrics.
+            Example: {"linear_regression": {"rmse": 0.123, "mae": 0.098, "r2": 0.85}}
+
+        Notes
+        -----
+        The validation split is intentionally not used for baseline models.
+        Baselines are trained once with fixed hyperparameters and evaluated
+        only on the held-out test set. This differs from temporal models
+        which may use the validation set for early stopping or hyperparameter
+        tuning (Hochreiter and Schmidhuber, 1997).
+        """
+        # Convert string paths to Path objects for robust path handling
+        processed = Path(processed_dir)
+        out = Path(output_dir)
+
+        # Create output directory structure
+        ensure_dir(out)
+        ensure_dir(out / "models")  # For serialised model objects
+        ensure_dir(out / "predictions")  # For prediction CSV files
+
+        logger.info("Loading preprocessed baseline datasets")
+
+        # Load training data
+        # This data has already been cleaned, scaled, and chronologically split
+        # by the preprocessing pipeline (preprocess.py)
+        X_train, y_train = self._load_split(processed / "train_baseline.csv")
+
+        # Load test data
+        # The test set represents future unseen data for final model evaluation
+        # Note: Validation split is intentionally not used here.
+        # Baselines are trained once with fixed hyperparameters
+        # and evaluated only on the held-out test set.
+        X_test, y_test = self._load_split(processed / "test_baseline.csv")
+
+        # Dictionary to store evaluation results
+        results = {}
+
+        # Train and evaluate each baseline model
+        for name, model in self.models.items():
+            logger.info(f"Training baseline model: {name}")
+
+            # Fit the model on training data
+            # For Linear Regression: solves ordinary least squares
+            # For Random Forest: builds ensemble of decision trees (Breiman, 2001)
+            model.fit(X_train, y_train)
+
+            # Generate predictions on test set
+            y_pred = model.predict(X_test)
+
+            # Compute evaluation metrics
+            metrics = self._evaluate(y_test, y_pred)
+            results[name] = metrics
+
+            # Persist trained model for later use or deployment
+            # Models are serialised using pickle for Python compatibility
+            # (Pedregosa et al., 2011)
+            with open(out / "models" / f"{name}.pkl", "wb") as f:
+                pickle.dump(model, f)
+
+            # Persist test set predictions for detailed error analysis
+            # Storing predictions alongside ground truth enables:
+            # - Residual analysis
+            # - Error distribution visualisation
+            # - Comparison with other models
+            pred_df = pd.DataFrame({
+                "y_true": y_test,  # Ground truth SSI values
+                "y_pred": y_pred,  # Model predictions
+            })
+            pred_df.to_csv(
+                out / "predictions" / f"{name}_test_predictions.csv",
+                index=False,
+            )
+
+            logger.info(f"{name} results: {metrics}")
+
+        return results
+
+
+def main():
+    """
+    Entry point for baseline model training script.
+
+    This function instantiates the BaselineTrainer, executes the training
+    pipeline, and prints formatted results to the console.
+
+    Usage
+    -----
+    Run from command line:
+        python baseline_models.py
+
+    The script will:
+    1. Load configuration from config.yaml
+    2. Train Linear Regression and Random Forest models
+    3. Evaluate on test set
+    4. Save models and predictions
+    5. Print evaluation metrics
+    """
+    # Instantiate trainer with default configuration
+    trainer = BaselineTrainer()
+
+    # Run complete training and evaluation pipeline
+    results = trainer.run()
+
+    # Print formatted results to console
+    print("\nBaseline model evaluation (SSI):")
+    for model, metrics in results.items():
+        print(f"\n{model}")
+        for k, v in metrics.items():
+            print(f"  {k}: {v:.4f}")
 
 
 if __name__ == "__main__":
-    trainer = BaselineTrainer()
-    trainer.train_linear_regression()
-    trainer.train_random_forest()
+    main()
