@@ -29,6 +29,7 @@ def parse_omni2_file(filepath: Path) -> Optional[pd.DataFrame]:
         (0, 4),  # Year
         (4, 8),  # DOY
         (8, 11),  # Hour
+        (36, 42),  # bt: Magnitude of average field vector |<B>| (word 10, F6.1)
         (78, 84),  # Bz GSM
         (123, 129),  # Proton density
         (129, 135),  # Bulk speed
@@ -39,6 +40,7 @@ def parse_omni2_file(filepath: Path) -> Optional[pd.DataFrame]:
         "year",
         "doy",
         "hour",
+        "bt",
         "bz_gsm",
         "density",
         "speed",
@@ -85,7 +87,7 @@ def parse_omni2_file(filepath: Path) -> Optional[pd.DataFrame]:
 
         df = df.dropna(subset=["datetime"])
 
-        out = df[["datetime", "bz_gsm", "speed", "density", "dst"]].copy()
+        out = df[["datetime", "bt", "bz_gsm", "speed", "density", "dst"]].copy()
         out = out.sort_values("datetime").reset_index(drop=True)
 
         print(

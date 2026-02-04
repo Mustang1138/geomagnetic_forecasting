@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # Expected schema for OMNI2 data after parsing.
 # Explicit schema validation ensures consistency between experiments
 # and prevents silent downstream failures (Martin, 2008).
-REQUIRED_COLUMNS = {"datetime", "bz_gsm", "speed", "density", "dst"}
+REQUIRED_COLUMNS = {"datetime", "bt", "bz_gsm", "speed", "density", "dst"}
 
 # Physical bounds are derived from empirical observations of the
 # near-Earth solar wind and geomagnetic response.
@@ -25,6 +25,7 @@ REQUIRED_COLUMNS = {"datetime", "bz_gsm", "speed", "density", "dst"}
 # Validators report potential anomalies; preprocessing applies stricter,
 # experiment-specific bounds defined in config.yaml.
 PHYSICAL_LIMITS = {
+    "bt": (0.0, 50.0),  # nT
     "bz_gsm": (-100.0, 100.0),  # nT
     "speed": (200.0, 2000.0),  # km/s
     "density": (0.0, 100.0),  # particles / cm^3

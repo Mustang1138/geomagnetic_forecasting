@@ -61,6 +61,7 @@ def _make_fake_df(n: int = 500) -> pd.DataFrame:
     return pd.DataFrame({
         "dst": np.linspace(0, -300, n),  # Quiet → extreme storm
         "bz_gsm": np.linspace(5, -20, n),  # Northward → strongly southward
+        "bt": np.linspace(3, 25, n),
         "speed": np.linspace(300, 800, n),  # Slow → fast solar wind
         "density": np.linspace(1, 40, n),  # Low → high density
     })

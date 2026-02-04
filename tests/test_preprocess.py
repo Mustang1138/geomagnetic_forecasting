@@ -7,13 +7,13 @@ from src.preprocess import DataPreprocessor
 def test_preprocess_shapes(tmp_path):
     """
     Integration-style test validating end-to-end preprocessing
-    output shapes for LSTM models.
+    output shapes for sequence models.
     """
 
-    # Create minimal synthetic dataset
     df = pd.DataFrame({
         "datetime": pd.date_range("2020-01-01", periods=2000, freq="h"),
         "bz_gsm": np.random.normal(0, 5, 2000),
+        "bt": np.random.normal(6, 2, 2000),
         "speed": np.random.normal(400, 50, 2000),
         "density": np.random.normal(5, 2, 2000),
         "dst": np.random.normal(-20, 10, 2000),

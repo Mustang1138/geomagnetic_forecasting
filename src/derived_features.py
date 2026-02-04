@@ -71,6 +71,15 @@ def _clip_and_normalise(
     return (x_clipped - min_val) / (max_val - min_val)
 
 
+def normalise_bt(bt: pd.Series) -> pd.Series:
+    """
+    Normalise IMF magnitude Bt (nT).
+
+    Bt represents the total available magnetic energy in the solar wind.
+    """
+    return _clip_and_normalise(bt, 0.0, 30.0)
+
+
 def normalise_dst(dst: pd.Series) -> pd.Series:
     """
     Normalise Dst index for storm severity.
@@ -207,72 +216,76 @@ def normalise_density(density: pd.Series) -> pd.Series:
 
 def compute_storm_severity_index(
         df: pd.DataFrame,
-        weights: Tuple[float, float, float, float] = (0.4, 0.3, 0.2, 0.1),
+        weights: Tuple[float, float, float, float, float] = (0.35, 0.25, 0.20, 0.10, 0.10)
 ) -> pd.DataFrame:
     """
-    Compute a continuous Storm Severity Index (SSI) in [0, 1].
+        Compute a continuous Storm Severity Index (SSI) in [0, 1].
 
-    The SSI aggregates key solar wind and geomagnetic drivers into a single
-    continuous metric suitable for regression modelling. This approach provides
-    a more nuanced target than binary storm/no-storm classification and allows
-    models to learn the continuous nature of storm intensity.
+        The Storm Severity Index (SSI) aggregates key solar wind and geomagnetic
+        drivers into a single continuous metric suitable for regression modelling.
+        This provides a more nuanced target than binary storm/no-storm classification
+        and allows models to learn the continuous nature of geomagnetic storm intensity.
 
-    The SSI combines four physical parameters:
-    1. Dst (ring current strength) - primary storm indicator
-    2. IMF Bz (solar wind–magnetosphere coupling) - reconnection driver
-    3. Solar wind speed - energy transfer rate
-    4. Solar wind proton density - dynamic pressure
+        The SSI combines five physically motivated parameters:
+            1. Dst (ring current strength) — primary storm intensity indicator
+            2. IMF Bz (GSM) — controls magnetic reconnection efficiency
+            3. IMF Bt (total magnetic field magnitude) — available magnetic energy
+            4. Solar wind speed — governs energy transfer rate
+            5. Solar wind proton density — contributes to dynamic pressure
 
-    These parameters are based on established solar wind-magnetosphere
-    coupling functions (Burton et al., 1975; Gonzalez et al., 1994).
+        These parameters are grounded in established solar wind–magnetosphere
+        coupling theory and empirical storm models
+        (Burton et al., 1975; Gonzalez et al., 1994; Papitashvili & King, 2020).
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Input DataFrame containing:
-        - 'dst': Disturbance Storm Time index (nT)
-        - 'bz_gsm': IMF Bz in GSM coordinates (nT)
-        - 'speed': Solar wind speed (km/s)
-        - 'density': Solar wind proton density (particles/cm³)
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Input DataFrame containing:
+                - 'dst' : Disturbance Storm Time index (nT)
+                - 'bz_gsm' : IMF Bz in GSM coordinates (nT)
+                - 'bt' : IMF total magnetic field magnitude (nT)
+                - 'speed' : Solar wind bulk speed (km/s)
+                - 'density' : Solar wind proton density (particles/cm³)
 
-    weights : tuple of float, optional
-        Weights for (Dst, Bz, speed, density).
-        Must sum to 1.0.
-        Default weights reflect relative importance of each parameter
-        in driving geomagnetic activity, with Dst receiving the highest
-        weight as the most direct measure of storm intensity.
+        weights : tuple of float, optional
+            Weights for (Dst, Bz, Bt, speed, density).
+            Must sum to 1.0.
+            Default values reflect the relative physical importance of each
+            parameter, with Dst and Bz receiving the highest weights.
 
-    Returns
-    -------
-    pd.DataFrame
-        Copy of input DataFrame with added columns:
-        - dst_norm: Normalised Dst [0, 1]
-        - bz_norm: Normalised southward Bz [0, 1]
-        - speed_norm: Normalised solar wind speed [0, 1]
-        - density_norm: Normalised solar wind density [0, 1]
-        - storm_severity_index: Weighted SSI [0, 1]
+        Returns
+        -------
+        pd.DataFrame
+            Copy of the input DataFrame with added columns:
+                - dst_norm : Normalised Dst contribution [0, 1]
+                - bz_norm : Normalised southward Bz contribution [0, 1]
+                - bt_norm : Normalised Bt contribution [0, 1]
+                - speed_norm : Normalised solar wind speed [0, 1]
+                - density_norm : Normalised solar wind density [0, 1]
+                - storm_severity_index : Weighted SSI in [0, 1]
 
-    Raises
-    ------
-    ValueError
-        If weights do not sum to 1.0 (within numerical precision).
+        Raises
+        ------
+        ValueError
+            If the provided weights do not sum to 1.0 (within numerical precision).
 
-    Notes
-    -----
-    The SSI is computed in physical space (before standardisation) to ensure
-    interpretability. Normalisation is applied to each component individually
-    before weighted aggregation, preventing any single parameter from dominating
-    due to scale differences.
+        Notes
+        -----
+        The SSI is computed entirely in physical space (prior to any statistical
+        standardisation) to preserve interpretability. Each component is
+        independently normalised before weighted aggregation, preventing any
+        single parameter from dominating due to scale differences.
 
-    This approach follows best practices for physics-informed feature engineering
-    in space weather forecasting (Liemohn et al., 2021).
-    """
+        This design follows best practices for physics-informed feature engineering
+        in space weather forecasting (Liemohn et al., 2021).
+        """
+
     # Validate weights sum to 1.0
     if not np.isclose(sum(weights), 1.0):
         raise ValueError("SSI weights must sum to 1.0")
 
     # Unpack weights for clarity
-    w_dst, w_bz, w_speed, w_density = weights
+    w_dst, w_bz, w_bt, w_speed, w_density = weights
 
     # Create copy to avoid modifying original DataFrame
     df = df.copy()
@@ -281,6 +294,7 @@ def compute_storm_severity_index(
     # This ensures all parameters contribute on the same scale
     df["dst_norm"] = normalise_dst(df["dst"])
     df["bz_norm"] = normalise_bz(df["bz_gsm"])
+    df["bt_norm"] = normalise_bt(df["bt"])
     df["speed_norm"] = normalise_speed(df["speed"])
     df["density_norm"] = normalise_density(df["density"])
 
@@ -288,11 +302,13 @@ def compute_storm_severity_index(
     # The weighting scheme reflects the relative importance of each parameter:
     # - Dst (0.4): Primary indicator of storm intensity
     # - Bz (0.3): Key driver of magnetospheric coupling
+    # - Bt
     # - Speed (0.2): Influences energy transfer rate
     # - Density (0.1): Secondary contribution to dynamic pressure
     df["storm_severity_index"] = (
             w_dst * df["dst_norm"]
             + w_bz * df["bz_norm"]
+            + w_bt * df["bt_norm"]
             + w_speed * df["speed_norm"]
             + w_density * df["density_norm"]
     )
@@ -418,41 +434,36 @@ def estimate_auroral_latitude(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_all_derived_features(
         df: pd.DataFrame,
-        ssi_weights: Tuple[float, float, float, float] = (0.4, 0.3, 0.2, 0.1),
+        ssi_weights: Tuple[float, float, float, float, float] = (0.30, 0.25, 0.20, 0.15, 0.10),
 ) -> pd.DataFrame:
     """
-    Apply all derived feature transformations in a single call.
+    Compute and append all physics-informed derived features.
 
-    This convenience function computes the complete set of derived features:
-    1. Storm Severity Index (SSI) - continuous target for regression
-    2. Storm severity class - categorical labels for classification
-    3. Auroral latitude estimate - visualisation and analysis aid
+    This convenience wrapper applies the complete derived-feature pipeline:
+        1. Storm Severity Index (SSI) — continuous regression target
+        2. Storm severity class — categorical interpretation of SSI
+        3. Auroral latitude estimate — qualitative geophysical proxy
 
     Parameters
     ----------
     df : pd.DataFrame
         Input DataFrame containing raw OMNI parameters:
-        - dst, bz_gsm, speed, density
+            - dst, bz_gsm, bt, speed, density
+
     ssi_weights : tuple of float, optional
-        Weights for SSI computation (Dst, Bz, speed, density).
-        Default is (0.4, 0.3, 0.2, 0.1).
+        Weights for SSI computation in the order:
+        (Dst, Bz, Bt, speed, density).
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with all derived features added.
+        DataFrame with all derived features appended.
 
     Notes
     -----
-    This function should be called on raw (unscaled) data in the preprocessing
-    pipeline, before any standardisation or normalisation is applied to the
-    features. This ensures that the derived features are computed in physical
-    space with interpretable units (Liemohn et al., 2021).
-
-    The order of operations is important:
-    1. Compute SSI (requires storm_severity_index column)
-    2. Assign classes (requires storm_severity_index column)
-    3. Estimate latitude (requires storm_severity_index column)
+    This function must be applied **before feature standardisation**
+    in the preprocessing pipeline. All derived quantities are computed
+    in physical units to preserve interpretability and scientific meaning.
     """
     # Compute continuous Storm Severity Index and normalised components
     df = compute_storm_severity_index(df, weights=ssi_weights)

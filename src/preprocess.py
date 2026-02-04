@@ -78,10 +78,9 @@ class DataPreprocessor:
         Fitted scaler for target variable (enables inverse transformation).
     """
 
-    # Input features: key solar wind parameters
-    # These are standard OMNI variables used in geomagnetic forecasting
-    # (Papitashvili and King, 2005, 2020)
-    FEATURE_COLS = ["bz_gsm", "speed", "density"]
+    # Input features used by ML models.
+    # Bt is included as an explicit coupling/energy term alongside Bz.
+    FEATURE_COLS = ["bt", "bz_gsm", "speed", "density"]
 
     # Target variable: continuous Storm Severity Index
     TARGET_COL = "storm_severity_index"

@@ -14,6 +14,7 @@ def test_validate_omni_dataframe_basic():
     df = pd.DataFrame({
         "datetime": pd.date_range("2020-01-01", periods=10, freq="h"),
         "bz_gsm": [0.0] * 10,
+        "bt": [6.0] * 10,
         "speed": [400.0] * 10,
         "density": [5.0] * 10,
         "dst": [-10.0] * 10,
@@ -35,9 +36,9 @@ def test_validate_preprocessed_data_passes():
         "val_samples": 500,
         "test_samples": 500,
         "sequence_length": 24,
-        "n_features": 3,
-        "feature_names": ["bz_gsm", "speed", "density"],
-        "target_name": "dst",
+        "n_features": 5,
+        "feature_names": ["bz_gsm", "bt", "speed", "density", "dst"],
+        "target_name": "storm_severity_index",
     }
 
     validate_preprocessed_data(summary)  # should not raise

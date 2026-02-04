@@ -8,8 +8,8 @@ data:
     # Defines the temporal coverage of the historical OMNI2 dataset.
     # Long temporal baselines are recommended for geomagnetic modelling
     # to capture multiple solar cycles (Papitashvili and King, 2020).
-    start: "2010-01-01"
-    end: "2026-01-23"
+    start: "2000-01-01"
+    end: "2026-02-02"
 
   # Raw and processed directories are configurable to avoid hard-coded paths,
   # supporting portability across environments (PEP 8, 2001).
@@ -75,6 +75,7 @@ training:
 
 # Data physical limits
 physical_limits:
+  bt: [ 0.0, 5.0 ]  # nT - |<B>|  (Bt)
   bz_gsm: [ -50, 50 ]  # nT - IMF Bz component
   speed: [ 200, 1200 ]  # km/s - Solar wind speed
   density: [ 0.1, 200 ]  # n/cc - Proton density
