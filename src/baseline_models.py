@@ -264,7 +264,13 @@ class BaselineTrainer:
             # - Residual analysis
             # - Error distribution visualisation
             # - Comparison with other models
+            #
+            # The 'model' column is included to support potential future
+            # consolidation of predictions from multiple models into a single
+            # DataFrame for comparative analysis (not currently used by
+            # evaluate.py but included for forward compatibility).
             pred_df = pd.DataFrame({
+                "model": name,  # Model identifier (for potential future use)
                 "y_true": y_test,  # Ground truth SSI values
                 "y_pred": y_pred,  # Model predictions
             })
