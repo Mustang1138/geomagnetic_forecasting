@@ -181,34 +181,115 @@ improves reproducibility.
 
 ---
 
-### 📋 Next Steps
+## Week 3 (2–8 February 2026)
 
-1. Implement evaluation metrics (RMSE, MAE, R²)
-2. Generate baseline performance plots
-3. Analyse baseline model performance
-4. Design LSTM architecture
-5. Implement temporal model training loop
-6. Compare temporal vs non-temporal approaches
+### 🎯 Objectives
+
+- Extend historical dataset coverage
+- Finalise derived feature set
+- Implement and lock baseline evaluation pipeline
+- Improve test coverage and pipeline robustness
+- Establish a clean “baseline checkpoint” for future models
 
 ---
 
-### ❓ Questions for Supervisor (Meeting: 28-01-2026)
+### ✅ Completed
 
-1. **Data Handling**
-    - Preferred strategy for handling missing data in geomagnetic time series?
-    - Acceptability of linear interpolation versus masking missing intervals?
+#### Dataset Extension
 
-2. **Train/Test Strategy**
-    - Recommended temporal split strategy for time-series evaluation?
-    - Suitable validation window size for this dataset?
+- ✓ Extended historical OMNI2 dataset coverage back to **2000**
+- ✓ Updated data ingestion and preprocessing logic to support longer time span
+- ✓ Revalidated temporal continuity and missing data characteristics
+- ✓ Confirmed preprocessing scalability over 25+ years of hourly data
 
-3. **Preprocessing**
-    - Any domain-specific feature transformations recommended?
-    - Preferred normalisation approach for solar wind parameters?
+#### Feature Engineering
 
-4. **Evaluation**
-    - Minimum baseline performance expectations?
-    - Value of comparison with published geomagnetic forecasting benchmarks?
+- ✓ Implemented derived feature computation (`derived_features.py`)
+- ✓ Added physically motivated transformations and aggregations
+- ✓ Ensured derived features are computed **after** temporal split
+- ✓ Added unit tests for derived feature correctness and stability
+
+#### Validation & Safeguards
+
+- ✓ Extended validation utilities to cover derived features
+- ✓ Added consistency checks for preprocessing outputs
+- ✓ Strengthened failure modes for invalid or empty datasets
+- ✓ Ensured all validation logic is test-covered
+
+#### Baseline Evaluation
+
+- ✓ Implemented standalone evaluation pipeline (`evaluate.py`)
+- ✓ Computed standard regression metrics:
+    - RMSE
+    - MAE
+    - R²
+- ✓ Generated diagnostic plots:
+    - Predicted vs true SSI time series
+    - Predicted vs true scatter plots
+- ✓ Saved consolidated metrics to `metrics_baselines.csv`
+- ✓ Ensured evaluation is strictly read-only with respect to data
+
+#### Testing & Stability
+
+- ✓ Added evaluation-specific tests using synthetic predictions
+- ✓ Ensured compatibility with sklearn API changes
+- ✓ Fixed edge cases where no prediction files are present
+- ✓ Confirmed all tests pass cleanly (`pytest`)
+
+Current test status:
+> ✅ All tests passing
+
+---
+
+### 🔒 Locked Components
+
+The following components are now considered **frozen reference implementations**:
+
+- Preprocessing pipeline
+- Derived feature computation
+- Baseline model definitions
+- Baseline evaluation metrics and plots
+- Preprocessing pipeline (inputs, splits, scaling)
+
+Any future model must:
+
+- Consume identical preprocessing outputs
+- Be evaluated against the same locked baselines
+- Report results relative to these reference metrics
+
+---
+
+### 🎓 Reflections
+
+Locking preprocessing and baselines before introducing temporal models significantly strengthens experimental validity.
+Extending the dataset back to 2000 improved statistical robustness and ensured that baseline performance is not an
+artefact of a limited solar cycle. Treating evaluation as a pure consumer of model predictions reduced coupling and
+simplified testing. At this point, improvements in performance can be attributed confidently to model design rather than
+pipeline changes.
+
+---
+
+### ⏱️ Time Tracking
+
+| Activity                         | Hours    |
+|----------------------------------|----------|
+| Dataset extension & revalidation | 2.5      |
+| Derived feature implementation   | 2.0      |
+| Evaluation & plotting pipeline   | 2.5      |
+| Testing & debugging              | 2.0      |
+| Documentation & cleanup          | 1.0      |
+| **Week 3 Total**                 | **10.0** |
+
+---
+
+### 📋 Next Steps
+
+1. Design temporal windowing strategy for sequence models
+2. Implement LSTM / GRU data loaders
+3. Define validation-driven early stopping
+4. Train first sequence baseline
+5. Compare temporal models against frozen baselines
+6. Analyse error behaviour during geomagnetic storm events
 
 ---
 
@@ -218,5 +299,5 @@ None currently identified.
 
 ---
 
-*Last Updated: 26-01-2026*  
-*Next Review: 28-01-2026*
+*Last Updated: 06-02-2026*  
+*Next Review: 10-02-2026*
