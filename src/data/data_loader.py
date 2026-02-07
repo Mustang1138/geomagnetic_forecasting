@@ -16,9 +16,9 @@ from typing import Optional
 import pandas as pd
 import requests
 
-from src.parsers import parse_omni2_file, parse_dscovr_json
+from src.evaluation.validators import validate_omni_dataframe
+from src.preprocessing.parsers import parse_omni2_file, parse_dscovr_json
 from src.utils import load_config, ensure_dir, setup_logging
-from src.validators import validate_omni_dataframe
 
 logger = setup_logging()
 

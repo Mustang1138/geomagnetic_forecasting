@@ -18,7 +18,7 @@ References:
 import numpy as np
 import pandas as pd
 
-from src.derived_features import (
+from src.features.derived_features import (
     compute_storm_severity_index,
     assign_storm_severity_class,
     estimate_auroral_latitude,

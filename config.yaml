@@ -88,5 +88,5 @@ evaluation:
     - mae
     - r2
 
-  plots_dir: "results/plots"
-  metrics_dir: "results/metrics"
+  plots_dir: "outputs/plots"
+  metrics_dir: "outputs/metrics"

@@ -32,9 +32,9 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from src.derived_features import add_all_derived_features
+from src.evaluation.validators import validate_omni_dataframe
+from src.features.derived_features import add_all_derived_features
 from src.utils import load_config, ensure_dir, setup_logging
-from src.validators import validate_omni_dataframe
 
 # Standardisation ensures zero-mean, unit-variance features, which is
 # particularly important for gradient-based neural networks such as LSTMs.

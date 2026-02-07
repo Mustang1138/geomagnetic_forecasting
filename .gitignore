@@ -24,10 +24,10 @@ data/processed/*
 !data/processed/.gitkeep
 
 # Results
-results/plots/*
-results/metrics/*
-!results/plots/.gitkeep
-!results/metrics/.gitkeep
+outputs/plots/*
+outputs/metrics/*
+!outputs/plots/.gitkeep
+!outputs/metrics/.gitkeep
 
 # Jupyter
 .ipynb_checkpoints/

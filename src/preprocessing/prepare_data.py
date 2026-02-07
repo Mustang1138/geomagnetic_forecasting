@@ -6,8 +6,8 @@ testability, and reproducibility
 (Martin, 2008; Lwakatare et al., 2020).
 """
 
-from src.preprocess import DataPreprocessor
-from src.validators import validate_preprocessed_data
+from src.evaluation.validators import validate_preprocessed_data
+from src.preprocessing.preprocess import DataPreprocessor
 
 # Execute preprocessing pipeline
 pre = DataPreprocessor()

@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.baseline_models import BaselineTrainer
+from src.models.baseline_models import BaselineTrainer
 
 
 def _make_dummy_dataset(path: Path, n: int = 50):
@@ -100,7 +100,7 @@ def test_baseline_models_train_and_predict(tmp_path):
     """
     # Set up temporary directory structure
     processed = tmp_path / "processed"
-    results = tmp_path / "results"
+    results = tmp_path / "outputs"
 
     processed.mkdir()
     results.mkdir()
@@ -121,11 +121,11 @@ def test_baseline_models_train_and_predict(tmp_path):
     )
 
     # Validate metrics structure
-    # Ensure both models are present in results
+    # Ensure both models are present in outputs
     assert "linear_regression" in metrics, \
-        "Linear Regression results missing from output"
+        "Linear Regression outputs missing from output"
     assert "random_forest" in metrics, \
-        "Random Forest results missing from output"
+        "Random Forest outputs missing from output"
 
     # Verify all expected metrics are computed for each model
     for model_name, model_metrics in metrics.items():

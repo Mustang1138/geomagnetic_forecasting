@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.validators import (
+from src.evaluation.validators import (
     validate_omni_dataframe,
     validate_preprocessed_data,
 )

@@ -25,9 +25,10 @@ References:
 """
 
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
@@ -279,8 +280,8 @@ def evaluate_baseline_models(
     results_dir : Path
         Directory containing model predictions and outputs.
         Expected structure:
-        - results/predictions/*.csv (for tests)
-        - results/baselines/predictions/*.csv (for production runs)
+        - outputs/predictions/*.csv (for tests)
+        - outputs/baselines/predictions/*.csv (for production runs)
 
     Outputs
     -------
@@ -289,7 +290,7 @@ def evaluate_baseline_models(
     Files:
     - metrics_baselines.csv: Summary table of all model metrics
 
-    Plots (in results/baselines/plots/):
+    Plots (in outputs/baselines/plots/):
     - {model_name}_timeseries.png: Time series comparison
     - {model_name}_scatter.png: Scatter plot
 
@@ -303,8 +304,8 @@ def evaluate_baseline_models(
     -----
     The function searches two possible locations for prediction files
     to support both test and production workflows:
-    1. results/predictions/ (used in unit tests)
-    2. results/baselines/predictions/ (used in actual model training)
+    1. outputs/predictions/ (used in unit tests)
+    2. outputs/baselines/predictions/ (used in actual model training)
 
     This dual-path approach ensures the evaluation code works correctly
     in both testing and production contexts without requiring different
@@ -345,8 +346,8 @@ def evaluate_baseline_models(
     if not prediction_files:
         raise RuntimeError(
             "No baseline prediction files found. "
-            "Expected '*_test_predictions.csv' under results/predictions "
-            "or results/baselines/predictions."
+            "Expected '*_test_predictions.csv' under outputs/predictions "
+            "or outputs/baselines/predictions."
         )
 
     # Process each model's predictions
@@ -406,7 +407,7 @@ if __name__ == "__main__":
         python evaluate.py
 
     It automatically determines the project root directory and evaluates
-    all baseline models found in the results directory.
+    all baseline models found in the outputs directory.
 
     Usage
     -----
@@ -425,12 +426,12 @@ if __name__ == "__main__":
     Prerequisites
     -------------
     - Baseline models must have been trained (baseline_models.py)
-    - Prediction files must exist in results/baselines/predictions/
+    - Prediction files must exist in outputs/baselines/predictions/
 
     Outputs
     -------
-    - results/metrics_baselines.csv: Metrics summary table
-    - results/baselines/plots/*.png: Diagnostic visualisations
+    - outputs/metrics_baselines.csv: Metrics summary table
+    - outputs/baselines/plots/*.png: Diagnostic visualisations
     """
     # Determine project root (two levels up from this file)
     # This works regardless of where the script is run from
@@ -439,5 +440,5 @@ if __name__ == "__main__":
     # Run evaluation with standard directory structure
     evaluate_baseline_models(
         processed_dir=project_root / "data" / "processed",
-        results_dir=project_root / "results",
+        results_dir=project_root / "outputs",
     )

@@ -14,11 +14,12 @@ References:
 - Liemohn et al. (2021) - Evaluation metrics for space physics models
 """
 
-import numpy as np
-import pandas as pd
 from pathlib import Path
 
-from src.evaluate import evaluate_baseline_models
+import numpy as np
+import pandas as pd
+
+from src.evaluation.evaluate import evaluate_baseline_models
 
 
 def _make_fake_predictions(path: Path, n: int = 200):
@@ -108,7 +109,7 @@ def test_evaluate_baseline_models_runs(tmp_path):
     """
     # Create expected directory structure
     # Mimics the actual project layout used in production
-    results_dir = tmp_path / "results"
+    results_dir = tmp_path / "outputs"
     predictions_dir = results_dir / "predictions"
     predictions_dir.mkdir(parents=True)
 
@@ -151,6 +152,6 @@ def test_evaluate_baseline_models_runs(tmp_path):
     # Check that both baseline models are represented
     # The index contains model names
     assert "linear_regression" in metrics.index, \
-        "Linear Regression results missing from metrics"
+        "Linear Regression outputs missing from metrics"
     assert "random_forest" in metrics.index, \
-        "Random Forest results missing from metrics"
+        "Random Forest outputs missing from metrics"

@@ -176,7 +176,7 @@ class BaselineTrainer:
     def run(
             self,
             processed_dir: str = "data/processed",
-            output_dir: str = "results/baselines",
+            output_dir: str = "outputs/baselines",
     ) -> Dict[str, Dict[str, float]]:
         """
         Execute the complete baseline model training and evaluation pipeline.
@@ -194,8 +194,8 @@ class BaselineTrainer:
             Directory containing preprocessed CSV files.
             Default is "data/processed".
         output_dir : str, optional
-            Directory for saving trained models, predictions, and results.
-            Default is "results/baselines".
+            Directory for saving trained models, predictions, and outputs.
+            Default is "outputs/baselines".
 
         Returns
         -------
@@ -234,7 +234,7 @@ class BaselineTrainer:
         # and evaluated only on the held-out test set.
         X_test, y_test = self._load_split(processed / "test_baseline.csv")
 
-        # Dictionary to store evaluation results
+        # Dictionary to store evaluation outputs
         results = {}
 
         # Train and evaluate each baseline model
@@ -279,7 +279,7 @@ class BaselineTrainer:
                 index=False,
             )
 
-            logger.info(f"{name} results: {metrics}")
+            logger.info(f"{name} outputs: {metrics}")
 
         return results
 
@@ -289,7 +289,7 @@ def main():
     Entry point for baseline model training script.
 
     This function instantiates the BaselineTrainer, executes the training
-    pipeline, and prints formatted results to the console.
+    pipeline, and prints formatted outputs to the console.
 
     Usage
     -----
@@ -309,7 +309,7 @@ def main():
     # Run complete training and evaluation pipeline
     results = trainer.run()
 
-    # Print formatted results to console
+    # Print formatted outputs to console
     print("\nBaseline model evaluation (SSI):")
     for model, metrics in results.items():
         print(f"\n{model}")

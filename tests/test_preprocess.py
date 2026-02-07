@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from src.preprocess import DataPreprocessor
+from src.preprocessing.preprocess import DataPreprocessor
 
 
 def test_preprocess_shapes(tmp_path):
