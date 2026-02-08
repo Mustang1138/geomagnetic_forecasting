@@ -31,6 +31,10 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+from src.models.persistence import persistence_forecast
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 # Metric computation
 
@@ -263,86 +267,53 @@ def evaluate_baseline_models(
     Evaluate baseline SSI regression models.
 
     This function orchestrates the complete evaluation workflow for
-    baseline models (Linear Regression, Random Forest):
+    baseline models (Linear Regression, Random Forest, Persistence):
 
     1. Discovers prediction files from trained models
     2. Loads predictions and ground truth
     3. Computes regression metrics (RMSE, MAE, R²)
     4. Generates diagnostic plots (time series, scatter)
-    5. Saves metrics summary and figures to disk
+    5. Evaluates persistence (t → t+1) baseline
+    6. Saves metrics summary and figures to disk
 
     Parameters
     ----------
     processed_dir : Path
         Directory containing processed datasets.
-        (Currently not used but included for API consistency with
-        future LSTM evaluation functions.)
+        Used for loading test targets for the persistence baseline.
     results_dir : Path
         Directory containing model predictions and outputs.
-        Expected structure:
-        - outputs/predictions/*.csv (for tests)
-        - outputs/baselines/predictions/*.csv (for production runs)
 
     Outputs
     -------
-    The function creates:
-
     Files:
     - metrics_baselines.csv: Summary table of all model metrics
 
     Plots (in outputs/baselines/plots/):
-    - {model_name}_timeseries.png: Time series comparison
-    - {model_name}_scatter.png: Scatter plot
-
-    Raises
-    ------
-    RuntimeError
-        If no prediction files are found in expected locations.
-        This typically indicates that models haven't been trained yet.
+    - {model_name}_timeseries.png
+    - {model_name}_scatter.png
 
     Notes
     -----
-    The function searches two possible locations for prediction files
-    to support both test and production workflows:
-    1. outputs/predictions/ (used in unit tests)
-    2. outputs/baselines/predictions/ (used in actual model training)
+    Persistence is evaluated as a naïve temporal lower bound:
+        ŷ[t+1] = y[t]
 
-    This dual-path approach ensures the evaluation code works correctly
-    in both testing and production contexts without requiring different
-    implementations.
-
-    Prediction files must follow the naming convention:
-    {model_name}_test_predictions.csv
-
-    Each CSV must contain columns:
-    - y_true: Ground truth SSI values
-    - y_pred: Model predictions
-
-    Metrics are computed using scikit-learn (Pedregosa et al., 2011)
-    and plots are generated using Matplotlib (Hunter, 2007).
+    It is not trained, serialised, or tuned, and is evaluated under
+    identical conditions to learned baselines.
     """
+
     # Discover baseline prediction files
-    # Support both test and production directory structures
+
     candidate_dirs = [
         results_dir / "predictions",  # Used in unit tests
         results_dir / "baselines" / "predictions",  # Used in production runs
     ]
 
-    # Collect all prediction CSV files from candidate directories
     prediction_files = []
     for d in candidate_dirs:
         if d.exists():
-            # Find all files matching the prediction naming pattern
             prediction_files.extend(d.glob("*_test_predictions.csv"))
 
-    # Create output directory for diagnostic plots
-    plots_dir = results_dir / "baselines" / "plots"
-    plots_dir.mkdir(parents=True, exist_ok=True)
-
-    # List to accumulate metrics from all models
-    metrics_rows = []
-
-    # Validate that we found at least one prediction file
     if not prediction_files:
         raise RuntimeError(
             "No baseline prediction files found. "
@@ -350,7 +321,19 @@ def evaluate_baseline_models(
             "or outputs/baselines/predictions."
         )
 
-    # Process each model's predictions
+    # Create output directories
+
+    plots_dir = results_dir / "baselines" / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    preds_dir = results_dir / "baselines" / "predictions"
+    preds_dir.mkdir(parents=True, exist_ok=True)
+
+    # List to accumulate metrics from all models
+    metrics_rows = []
+
+    # Evaluate learned baseline models (Linear Regression, Random Forest)
+
     for pred_file in prediction_files:
         # Extract model name from filename
         # E.g., "linear_regression_test_predictions.csv" → "linear_regression"
@@ -362,15 +345,11 @@ def evaluate_baseline_models(
         y_pred = df["y_pred"].values
 
         # Compute regression metrics
-        # Returns dict with rmse, mae, r2
         metrics = compute_regression_metrics(y_true, y_pred)
-
-        # Add model identifier to metrics
         metrics["model"] = model_name
         metrics_rows.append(metrics)
 
-        # Generate time series plot
-        # Shows temporal evolution of predictions vs truth
+        # Generate diagnostic plots
         plot_timeseries(
             y_true,
             y_pred,
@@ -378,8 +357,6 @@ def evaluate_baseline_models(
             plots_dir / f"{model_name}_timeseries.png",
         )
 
-        # Generate scatter plot
-        # Shows prediction accuracy distribution
         plot_scatter(
             y_true,
             y_pred,
@@ -387,17 +364,64 @@ def evaluate_baseline_models(
             plots_dir / f"{model_name}_scatter.png",
         )
 
-    # Compile metrics from all models into a summary table
-    # Index by model name for easy lookup
-    metrics_df = pd.DataFrame(metrics_rows).set_index("model")
+    # Evaluate persistence (t → t+1) baseline
 
-    # Save metrics summary to CSV
-    # This table enables easy comparison across models
+    test_csv = processed_dir / "test_baseline.csv"
+    if not test_csv.exists():
+        raise RuntimeError(
+            "Persistence baseline requires test_baseline.csv "
+            "in processed directory."
+        )
+
+    # Load test target series
+    df_test = pd.read_csv(test_csv)
+    y = df_test["storm_severity_index"].values
+
+    # Generate persistence predictions
+    y_true, y_pred = persistence_forecast(y)
+
+    # Compute metrics
+    metrics = compute_regression_metrics(y_true, y_pred)
+    metrics["model"] = "persistence"
+    metrics_rows.append(metrics)
+
+    # Save persistence predictions
+    pd.DataFrame({
+        "model": "persistence",
+        "y_true": y_true,
+        "y_pred": y_pred,
+    }).to_csv(
+        preds_dir / "persistence_test_predictions.csv",
+        index=False,
+    )
+
+    # Generate persistence plots
+    plot_timeseries(
+        y_true,
+        y_pred,
+        "persistence",
+        plots_dir / "persistence_timeseries.png",
+    )
+
+    plot_scatter(
+        y_true,
+        y_pred,
+        "persistence",
+        plots_dir / "persistence_scatter.png",
+    )
+
+    # Save consolidated metrics table
+
+    metrics_df = (
+        pd.DataFrame(metrics_rows)
+        .set_index("model")
+        .sort_index()
+    )
+
     metrics_df.to_csv(results_dir / "metrics_baselines.csv")
 
 
 # CLI entry point
-
 
 if __name__ == "__main__":
     """
@@ -439,6 +463,6 @@ if __name__ == "__main__":
 
     # Run evaluation with standard directory structure
     evaluate_baseline_models(
-        processed_dir=project_root / "data" / "processed",
-        results_dir=project_root / "outputs",
+        processed_dir=PROJECT_ROOT / "data" / "processed",
+        results_dir=PROJECT_ROOT / "outputs",
     )
