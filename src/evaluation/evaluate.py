@@ -367,48 +367,43 @@ def evaluate_baseline_models(
     # Evaluate persistence (t → t+1) baseline
 
     test_csv = processed_dir / "test_baseline.csv"
-    if not test_csv.exists():
-        raise RuntimeError(
-            "Persistence baseline requires test_baseline.csv "
-            "in processed directory."
+
+    if test_csv.exists():
+        # Load test target series
+        df_test = pd.read_csv(test_csv)
+        y = df_test["storm_severity_index"].values
+
+        # Generate persistence predictions
+        y_true, y_pred = persistence_forecast(y)
+
+        metrics = compute_regression_metrics(y_true, y_pred)
+        metrics["model"] = "persistence"
+        metrics_rows.append(metrics)
+
+        # Save persistence predictions
+        pd.DataFrame({
+            "model": "persistence",
+            "y_true": y_true,
+            "y_pred": y_pred,
+        }).to_csv(
+            preds_dir / "persistence_test_predictions.csv",
+            index=False,
         )
 
-    # Load test target series
-    df_test = pd.read_csv(test_csv)
-    y = df_test["storm_severity_index"].values
+        # Generate persistence plots
+        plot_timeseries(
+            y_true,
+            y_pred,
+            "persistence",
+            plots_dir / "persistence_timeseries.png",
+        )
 
-    # Generate persistence predictions
-    y_true, y_pred = persistence_forecast(y)
-
-    # Compute metrics
-    metrics = compute_regression_metrics(y_true, y_pred)
-    metrics["model"] = "persistence"
-    metrics_rows.append(metrics)
-
-    # Save persistence predictions
-    pd.DataFrame({
-        "model": "persistence",
-        "y_true": y_true,
-        "y_pred": y_pred,
-    }).to_csv(
-        preds_dir / "persistence_test_predictions.csv",
-        index=False,
-    )
-
-    # Generate persistence plots
-    plot_timeseries(
-        y_true,
-        y_pred,
-        "persistence",
-        plots_dir / "persistence_timeseries.png",
-    )
-
-    plot_scatter(
-        y_true,
-        y_pred,
-        "persistence",
-        plots_dir / "persistence_scatter.png",
-    )
+        plot_scatter(
+            y_true,
+            y_pred,
+            "persistence",
+            plots_dir / "persistence_scatter.png",
+        )
 
     # Save consolidated metrics table
 
@@ -420,8 +415,6 @@ def evaluate_baseline_models(
 
     metrics_df.to_csv(results_dir / "metrics_baselines.csv")
 
-
-# CLI entry point
 
 if __name__ == "__main__":
     """
