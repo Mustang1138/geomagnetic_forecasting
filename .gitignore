@@ -43,7 +43,7 @@ Thumbs.db
 *.pth
 *.pkl
 *.h5
-models/
+outputs/baselines/models
 checkpoints/
 
 # Logs
