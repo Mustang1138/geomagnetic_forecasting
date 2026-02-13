@@ -1,27 +1,24 @@
-# Geomagnetic Forecasting – Machine Learning Evaluation Project
+# 🌌 Geomagnetic Forecasting – Machine Learning Evaluation Project
 
-**An offline, research-focused investigation evaluating whether temporal machine learning models provide measurable
-performance improvements over classical baselines for geomagnetic activity forecasting.**
+**A controlled research study evaluating whether temporal deep learning models provide measurable performance improvements over classical baselines for geomagnetic activity forecasting.**
 
 ---
 
 ## 📋 Project Information
 
-- **Student:** Mark Lewis (25214071)
-- **Supervisor:** Prof. Ella Pereira
-- **Module:** CIS3425 – Research and Development Project
-- **Programme:** B.Sc. (Hons) Software Engineering
-- **Academic Year:** 2025/2026
+- **Student:** Mark Lewis (25214071)  
+- **Supervisor:** Prof. Ella Pereira  
+- **Module:** CIS3425 – Research and Development Project  
+- **Programme:** B.Sc. (Hons) Software Engineering  
+- **Academic Year:** 2025/2026  
 
 ---
 
-## 🎯 Project Aim
+## 🎯 Research Question
 
-The primary aim of this project is to **critically evaluate whether temporal machine learning models (specifically
-LSTMs) outperform established non-temporal baseline models** when forecasting geomagnetic activity.
+> Do temporal sequence models (LSTM, GRU) meaningfully improve geomagnetic forecasting performance compared to classical baselines under controlled preprocessing conditions?
 
-The project focuses on *methodological fairness, reproducibility, and scientific validity* rather than operational
-deployment.
+The project focuses on **methodological fairness, reproducibility, and scientific validity** rather than operational deployment.
 
 Specifically, the project:
 
@@ -36,20 +33,22 @@ Specifically, the project:
 
 This project is intentionally scoped as an **offline, proof-of-concept research study**.
 
-### Included
+### ✅ Included
 
-- ✅ Historical data analysis (2010–2026)
-- ✅ Rigorous data ingestion, validation, and preprocessing
-- ✅ Feature engineering for both tabular and temporal models
-- ✅ Controlled comparison of baseline and temporal models
-- ✅ Quantitative performance evaluation
+- Historical data analysis (2010–2026)
+- Rigorous data ingestion, validation, and preprocessing
+- Feature engineering for both tabular and temporal models
+- Baseline regression models (Linear, Random Forest, Persistence)
+- Temporal sequence models (LSTM & GRU)
+- Controlled model comparison using consistent splits
+- Quantitative performance evaluation and visualisation
 
-### Excluded
+### ❌ Excluded
 
-- ❌ Real-time forecasting or alerting
-- ❌ Production deployment
-- ❌ Operational space-weather services
-- ❌ GPU-dependent or distributed systems
+- Real-time forecasting or alerting systems
+- Production deployment
+- Operational space-weather services
+- GPU-dependent or distributed training systems
 
 ---
 
@@ -60,37 +59,74 @@ geomagnetic_forecasting/
 │
 ├── data/
 │   ├── raw/                    # Raw downloaded datasets (OMNI2, DSCOVR)
-│   └── processed/              # Frozen, preprocessed datasets
+│   └── processed/              # Frozen, preprocessed datasets & scalers
 │
 ├── src/
 │   ├── __init__.py             # Package marker for src module
-│   ├── data_loader.py          # Data acquisition and consolidation
-│   ├── parsers.py              # OMNI2 and DSCOVR parsing utilities
-│   ├── validators.py           # Schema, continuity, and physical validation
-│   ├── preprocess.py           # Cleaning and feature engineering
-│   ├── baseline_models.py      # Linear regression and ensemble baselines
-│   ├── temporal_model.py       # LSTM-based temporal model
-│   ├── train.py                # Model training pipeline
-│   ├── evaluate.py             # Metric calculation and comparison
+│   │
+│   ├── data/
+│   │   ├── data_loader.py      # Data acquisition and consolidation
+│   │   ├── data_sources.py     # Data source configurations
+│   │   ├── sequence_datasets.py # Sequence window construction
+│   │   └── torch_datasets.py   # PyTorch dataset adapters
+│   │
+│   ├── preprocessing/
+│   │   ├── parsers.py          # OMNI2 and DSCOVR parsing utilities
+│   │   ├── prepare_data.py     # Data preparation pipeline
+│   │   └── preprocess.py       # Cleaning and feature engineering
+│   │
+│   ├── features/
+│   │   └── derived_features.py # Feature engineering utilities
+│   │
+│   ├── models/
+│   │   ├── baseline_models.py  # Linear and Random Forest models
+│   │   ├── persistence.py      # Persistence baseline
+│   │   ├── temporal_model.py   # LSTMRegressor, GRURegressor
+│   │   └── training/           # Training procedures
+│   │       ├── train_baselines.py
+│   │       ├── train_lstm.py
+│   │       ├── train_gru.py
+│   │       └── train_utils.py
+│   │
+│   ├── evaluation/
+│   │   ├── evaluate.py         # Metric calculation and comparison
+│   │   └── validators.py       # Schema, continuity, and physical validation
+│   │
+│   ├── run_baselines.py        # Baseline execution script
 │   └── utils.py                # Logging and helper utilities
 │
 ├── results/
-│   ├── plots/                  # Evaluation visualisations
-│   └── metrics/                # Model performance metrics (CSV)
+│   ├── baselines/
+│   │   ├── models/             # Trained baseline model artifacts
+│   │   ├── plots/              # Baseline visualisations
+│   │   └── predictions/        # Baseline predictions (CSV)
+│   └── metrics_baselines.csv   # Baseline performance metrics
 │
-├── tests/                      # Unit tests for preprocessing and validation
-│   ├── test_preprocess.py
-│   ├── test_validators.py
-│   └── test_baseline_models.py
+├── outputs/
+│   ├── plots/                  # Additional evaluation plots
+│   └── metrics/                # Additional metrics
 │
-├── notebooks/                  # Exploratory analysis notebooks
-├── docs/                       # Project documentation and progress logs
+├── tests/                      # Unit tests for all components
+│
+├── docs/                       # Project documentation
 │   └── progress_notes.md
 │
+├── logs/                       # Execution logs
 ├── config.yaml                 # Centralised configuration
 ├── requirements.txt            # Python dependencies
+├── pytest.ini                  # Pytest configuration
+├── LICENSE                     # MIT Licence
+├── REFERENCES.md               # Project references
 └── README.md                   # Project overview
 ```
+
+**Design Principles:**
+
+- Separation of concerns (data vs models vs training vs evaluation)
+- Stateless model classes for testability
+- Deterministic preprocessing with frozen artifacts
+- Reproducible end-to-end execution
+- Extensibility for future architectures (e.g., Transformers)
 
 ---
 
@@ -110,9 +146,9 @@ geomagnetic_forecasting/
 
 ---
 
-## 🧹 Preprocessing & Experimental Control
+## 🔄 Unified Preprocessing Pipeline
 
-A **single unified preprocessing pipeline** is used for *all* models.
+A **single unified preprocessing pipeline** is applied to **all models** to eliminate bias.
 
 This design is a deliberate methodological choice to ensure that:
 
@@ -120,33 +156,34 @@ This design is a deliberate methodological choice to ensure that:
 - Data leakage is strictly prevented
 - Observed performance differences arise from model architecture, not preprocessing
 
-Key preprocessing steps include:
+**Key Steps:**
 
-- Chronological validation and sorting
-- Physically motivated range filtering using domain-informed bounds
-- Forward/backward filling of short missing intervals
-- Strict chronological train/validation/test splitting
-- Feature standardisation using training data only
+1. Chronological validation and sorting
+2. Schema and physical plausibility checks
+3. Forward/backward filling of short missing intervals
+4. **Explicit assertion: no null values reach model training**
+5. Strict chronological train/validation/test split
+6. Feature scaling fit on training data only
+7. Frozen output persistence for reproducibility
 
 Preprocessed outputs are **frozen to disk** and reused unchanged by all models.
 
 The same cleaned and scaled datasets are consumed by:
 
 - Classical baseline models (tabular format)
-- Temporal models (sequence format for LSTM)
+- Temporal models (sequence format for LSTM/GRU)
 
 ---
 
-## 🤖 Models
+## 🤖 Models Implemented
 
 ### Baseline Models
 
 Baseline models establish conservative reference performance using classical, non-temporal machine learning methods.
 
-- **Linear Regression**
-  - Interpretable linear benchmark
-- **Random Forest Regressor**
-  - Non-linear ensemble with fixed hyperparameters
+- **Linear Regression** – Interpretable linear benchmark
+- **Random Forest Regressor** – Non-linear ensemble with fixed hyperparameters
+- **Persistence Model** – Last value predictor
 
 Baseline models:
 
@@ -154,15 +191,27 @@ Baseline models:
 - Perform no additional cleaning or scaling
 - Are intentionally not exhaustively tuned
 
-### Temporal Model
+### Temporal Deep Learning Models
 
-- **LSTM (Long Short-Term Memory)**
-- Captures temporal dependencies in solar wind–geomagnetic interactions
-- Trained on fixed-length sequences derived from the same preprocessed data
+Implemented in PyTorch:
+
+- **LSTM Regressor** (Long Short-Term Memory)
+- **GRU Regressor** (Gated Recurrent Unit)
+
+Both models:
+
+- Capture temporal dependencies in solar wind–geomagnetic interactions
+- Enforce explicit input shape validation
+- Accept input of shape `(batch, seq_len, n_features)`
+- Produce scalar sequence-to-one predictions
+- Share consistent interfaces for fair comparison
+- Are trained on fixed-length sequences derived from the same preprocessed data
+
+All models use identical training/validation/test splits and evaluation metrics.
 
 ---
 
-## 📈 Evaluation
+## 📈 Evaluation Strategy
 
 Models are evaluated using standard regression metrics:
 
@@ -170,8 +219,16 @@ Models are evaluated using standard regression metrics:
 - **MAE** – Mean Absolute Error
 - **R²** – Coefficient of Determination
 
-Results are analysed quantitatively and visually to assess both average performance and temporal behaviour. Qualitative
-assessment is supported via time-series visualisations of predictions versus observations.
+**Evaluation Process:**
+
+- Identical test sets across all models
+- Inverse scaling of predictions for fair comparison
+- Quantitative performance tables
+- Visual comparison plots and time-series visualisations
+
+Results are analysed quantitatively and visually to assess both average performance and temporal behaviour.
+
+The objective is controlled architectural comparison, not hyperparameter maximisation.
 
 ---
 
@@ -194,7 +251,9 @@ Automated tests validate:
 
 - Preprocessing correctness and sequence construction
 - Schema and physical validation logic
-- Baseline model training and artefact persistence
+- Baseline model training and artifact persistence
+- LSTM and GRU input validation
+- Torch dataset adapters
 - Minimum dataset size and shape constraints
 
 Tests are implemented using `pytest` and operate entirely on synthetic data to ensure isolation and reproducibility.
@@ -202,7 +261,7 @@ Tests are implemented using `pytest` and operate entirely on synthetic data to e
 Run all tests with:
 
 ```bash
-python -m pytest
+pytest
 ```
 
 ---
@@ -236,21 +295,31 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
 ## 🚀 Usage
 
-Example end-to-end workflow:
+Run full pipeline (TBC)
 
 ```bash
-# 1. Download and parse raw datasets
-python -m src.data_loader
-
-# 2. Preprocess and engineer features
-python -m src.preprocess
-
-# 3. Train baseline and temporal models
-python -m src.train
-
-# 4. Evaluate and compare performance
-python -m src.evaluate
+python -m src.run_all
 ```
+
+This executes:
+- Data ingestion
+- Preprocessing
+- Baseline model training
+- Temporal model training (LSTM & GRU)
+- Evaluation and visualisation
+
+*Note: A unified run script to execute the complete pipeline will be implemented upon project completion.*
+
+---
+
+## 🔮 Future Extensions
+
+- Hyperparameter optimisation
+- Transformer-based sequence models
+- Probabilistic forecasting (prediction intervals)
+- Interactive web-based visualisation
+- Geographical auroral activity mapping
+- Unified experiment execution script
 
 ---
 
@@ -266,16 +335,16 @@ docs/progress_notes.md
 
 ## 📄 Licence
 
-MIT Licence — Academic research project for Edge Hill University.
+MIT Licence – Academic research project for Edge Hill University.
 
 ---
 
 ## 🙏 Acknowledgements
 
-- Prof. Ella Pereira (Project Supervisor)
+- Prof. Ella Pereira – Project Supervisor
 - NASA Space Physics Data Facility (SPDF)
 - NOAA Space Weather Prediction Center
 
 ---
 
-*Last updated: January 2026*
+*Last updated: February 2026*

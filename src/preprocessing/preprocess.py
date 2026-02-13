@@ -508,6 +508,12 @@ class DataPreprocessor:
 
         # Data cleaning
         df = self._handle_missing(df)  # Fill missing values
+
+        # Sanity check: no missing values after imputation
+        assert not df[self.FEATURE_COLS + [self.TARGET_COL]].isnull().any().any(), (
+            "Missing values remain after imputation"
+        )
+
         df = self._remove_physical_outliers(df)  # Remove unphysical samples
 
         # 🔒 DERIVED FEATURES COMPUTED IN PHYSICAL SPACE
