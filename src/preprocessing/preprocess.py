@@ -109,7 +109,8 @@ class DataPreprocessor:
         self.config = load_config(config_path)
 
         # Separate scalers for inputs and target prevent target leakage
-        # and allow inverse-transforming predictions later (Pedregosa et al., 2011).
+        # and allow inverse-transforming predictions later (Pedregosa et al.,
+        # 2011).
 
         # Scaler for input features (X)
         # Will be fitted on training data only to prevent information leakage
@@ -157,7 +158,8 @@ class DataPreprocessor:
         df = df.sort_values("datetime").reset_index(drop=True)
 
         # Specify columns to fill
-        # Include both features and Dst (needed for derived feature computation)
+        # Include both features and Dst (needed for derived feature
+        # computation)
         cols = self.FEATURE_COLS + ["dst"]
 
         # Forward-fill followed by backward-fill ensures gaps at both
@@ -210,7 +212,8 @@ class DataPreprocessor:
         for col, (low, high) in limits.items():
             if col in df.columns:
                 # Remove samples outside [low, high] range
-                # This is a row-wise filter, so samples violating any limit are removed
+                # This is a row-wise filter, so samples violating any limit are
+                # removed
                 df = df[(df[col] >= low) & (df[col] <= high)]
 
         return df
@@ -408,7 +411,8 @@ class DataPreprocessor:
         target = df[self.TARGET_COL].values
 
         # Create sliding windows
-        # Stop at len(df) - seq_len to ensure we have a target for each sequence
+        # Stop at len(df) - seq_len to ensure we have a target for each
+        # sequence
         for i in range(len(df) - seq_len):
             # Input sequence: features from time i to i+seq_len (exclusive)
             X.append(features[i:i + seq_len])
@@ -508,12 +512,6 @@ class DataPreprocessor:
 
         # Data cleaning
         df = self._handle_missing(df)  # Fill missing values
-
-        # Sanity check: no missing values after imputation
-        assert not df[self.FEATURE_COLS + [self.TARGET_COL]].isnull().any().any(), (
-            "Missing values remain after imputation"
-        )
-
         df = self._remove_physical_outliers(df)  # Remove unphysical samples
 
         # 🔒 DERIVED FEATURES COMPUTED IN PHYSICAL SPACE
@@ -521,6 +519,10 @@ class DataPreprocessor:
         # auroral latitude) BEFORE scaling to maintain physical interpretability.
         # Scaling is applied afterwards to the complete feature set.
         df = add_all_derived_features(df)
+
+        # Sanity check: no missing values after imputation
+        assert not df[self.FEATURE_COLS + [self.TARGET_COL]
+                      ].isnull().any().any(), ("Missing values remain after imputation")
 
         # Chronological splitting (prevents temporal leakage)
         train, val, test = self._split(df)

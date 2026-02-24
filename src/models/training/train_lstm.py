@@ -32,9 +32,10 @@ from src.utils import load_config, setup_logging
 logger = setup_logging()
 
 
+# Model Definition
 class LSTMRegressor(nn.Module):
     """
-    Sequence-to-one LSTM regression model.
+    Multi-layer LSTM regressor for SSI forecasting.
     """
 
     def __init__(self, input_size, hidden_size, num_layers, dropout):
@@ -58,14 +59,16 @@ class LSTMRegressor(nn.Module):
         return self.fc(out)
 
 
+# Training Function
 def train_lstm(data_dir="data/processed"):
+
     config = load_config()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
     data_dir = Path(data_dir)
 
-    # Load sequence datasets (.npy files produced by preprocessing)
+    # Load preprocessed arrays
     X_train = np.load(data_dir / "X_train.npy")
     y_train = np.load(data_dir / "y_train.npy")
 
@@ -75,7 +78,7 @@ def train_lstm(data_dir="data/processed"):
     X_test = np.load(data_dir / "X_test.npy")
     y_test = np.load(data_dir / "y_test.npy")
 
-    # Convert to PyTorch tensors
+    # Dataloaders
     train_ds = TensorDataset(
         torch.tensor(X_train, dtype=torch.float32),
         torch.tensor(y_train, dtype=torch.float32),
@@ -89,7 +92,7 @@ def train_lstm(data_dir="data/processed"):
     train_loader = DataLoader(
         train_ds,
         batch_size=config["models"]["lstm"]["batch_size"],
-        shuffle=False,  # Preserve temporal order
+        shuffle=False,
     )
 
     val_loader = DataLoader(val_ds, batch_size=256, shuffle=False)
@@ -110,12 +113,15 @@ def train_lstm(data_dir="data/processed"):
         lr=config["models"]["lstm"]["learning_rate"],
     )
 
-    # Early stopping setup
+    # Early Stopping Setup
+    model_dir = Path("outputs/temporal/models")
+    model_dir.mkdir(parents=True, exist_ok=True)
+
     best_val_loss = float("inf")
     patience = 8
     patience_counter = 0
 
-    # Training loop
+    # Training Loop
     for epoch in range(config["models"]["lstm"]["epochs"]):
 
         model.train()
@@ -134,7 +140,7 @@ def train_lstm(data_dir="data/processed"):
 
         train_loss /= len(train_loader)
 
-        # Validation evaluation
+        # Validation
         model.eval()
         val_loss = 0.0
 
@@ -148,17 +154,15 @@ def train_lstm(data_dir="data/processed"):
         val_loss /= len(val_loader)
 
         logger.info(
-            f"Epoch {epoch + 1}: Train Loss={train_loss:.4f}, "
-            f"Val Loss={val_loss:.4f}"
+            f"Epoch {epoch + 1}: "
+            f"Train={train_loss:.6f}, "
+            f"Val={val_loss:.6f}"
         )
 
-        # Early stopping condition
+        # Early stopping check
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
-            model_dir = Path("outputs/temporal/models")
-            model_dir.mkdir(parents=True, exist_ok=True)
-
             torch.save(model.state_dict(), model_dir / "lstm_best.pt")
         else:
             patience_counter += 1
@@ -166,7 +170,7 @@ def train_lstm(data_dir="data/processed"):
                 logger.info("Early stopping triggered.")
                 break
 
-    # Test inference
+    # Test Inference
     model.load_state_dict(torch.load(model_dir / "lstm_best.pt"))
     model.eval()
 
@@ -175,23 +179,21 @@ def train_lstm(data_dir="data/processed"):
     with torch.no_grad():
         preds = model(X_test_tensor).cpu().numpy()
 
-    # Inverse scaling
+    # Inverse Scaling
     with open(data_dir / "scaler_y.pkl", "rb") as f:
         scaler_y = pickle.load(f)
 
-    y_test_inv = scaler_y.inverse_transform(y_test)
-    preds_inv = scaler_y.inverse_transform(preds)
+    y_test_inv = scaler_y.inverse_transform(y_test.reshape(-1, 1))
+    preds_inv = scaler_y.inverse_transform(preds.reshape(-1, 1))
 
-    # Save predictions to CSV
+    # Save Predictions
     pred_dir = Path("outputs/temporal/predictions")
     pred_dir.mkdir(parents=True, exist_ok=True)
 
-    df_preds = pd.DataFrame(
-        {
-            "y_true": y_test_inv.flatten(),
-            "y_pred": preds_inv.flatten(),
-        }
-    )
+    df_preds = pd.DataFrame({
+        "y_true": y_test_inv.flatten(),
+        "y_pred": preds_inv.flatten(),
+    })
 
     df_preds.to_csv(pred_dir / "lstm_predictions.csv", index=False)
 

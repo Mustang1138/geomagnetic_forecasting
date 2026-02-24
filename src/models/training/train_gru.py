@@ -25,9 +25,10 @@ from src.utils import load_config, setup_logging
 logger = setup_logging()
 
 
+# Model Definition
 class GRURegressor(nn.Module):
     """
-    Sequence-to-one GRU regression model.
+    Multi-layer GRU regressor for SSI forecasting.
     """
 
     def __init__(self, input_size, hidden_size, num_layers, dropout):
@@ -49,14 +50,15 @@ class GRURegressor(nn.Module):
         return self.fc(out)
 
 
+# Training Function
 def train_gru(data_dir="data/processed"):
+
     config = load_config()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
     data_dir = Path(data_dir)
 
-    # Load arrays
     X_train = np.load(data_dir / "X_train.npy")
     y_train = np.load(data_dir / "y_train.npy")
 
@@ -99,6 +101,9 @@ def train_gru(data_dir="data/processed"):
         lr=config["models"]["lstm"]["learning_rate"],
     )
 
+    model_dir = Path("outputs/temporal/models")
+    model_dir.mkdir(parents=True, exist_ok=True)
+
     best_val_loss = float("inf")
     patience = 8
     patience_counter = 0
@@ -134,16 +139,14 @@ def train_gru(data_dir="data/processed"):
         val_loss /= len(val_loader)
 
         logger.info(
-            f"Epoch {epoch + 1}: Train Loss={train_loss:.4f}, "
-            f"Val Loss={val_loss:.4f}"
+            f"Epoch {epoch + 1}: "
+            f"Train={train_loss:.6f}, "
+            f"Val={val_loss:.6f}"
         )
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
-            model_dir = Path("outputs/temporal/models")
-            model_dir.mkdir(parents=True, exist_ok=True)
-
             torch.save(model.state_dict(), model_dir / "gru_best.pt")
         else:
             patience_counter += 1
@@ -163,18 +166,16 @@ def train_gru(data_dir="data/processed"):
     with open(data_dir / "scaler_y.pkl", "rb") as f:
         scaler_y = pickle.load(f)
 
-    y_test_inv = scaler_y.inverse_transform(y_test)
-    preds_inv = scaler_y.inverse_transform(preds)
+    y_test_inv = scaler_y.inverse_transform(y_test.reshape(-1, 1))
+    preds_inv = scaler_y.inverse_transform(preds.reshape(-1, 1))
 
     pred_dir = Path("outputs/temporal/predictions")
     pred_dir.mkdir(parents=True, exist_ok=True)
 
-    df_preds = pd.DataFrame(
-        {
-            "y_true": y_test_inv.flatten(),
-            "y_pred": preds_inv.flatten(),
-        }
-    )
+    df_preds = pd.DataFrame({
+        "y_true": y_test_inv.flatten(),
+        "y_pred": preds_inv.flatten(),
+    })
 
     df_preds.to_csv(pred_dir / "gru_predictions.csv", index=False)
 

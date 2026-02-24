@@ -170,7 +170,8 @@ class BaselineTrainer:
         return {
             "rmse": rmse,  # Root Mean Squared Error
             "mae": mean_absolute_error(y_true, y_pred),  # Mean Absolute Error
-            "r2": r2_score(y_true, y_pred),  # R-squared (coefficient of determination)
+            # R-squared (coefficient of determination)
+            "r2": r2_score(y_true, y_pred),
         }
 
     def run(
@@ -243,7 +244,8 @@ class BaselineTrainer:
 
             # Fit the model on training data
             # For Linear Regression: solves ordinary least squares
-            # For Random Forest: builds ensemble of decision trees (Breiman, 2001)
+            # For Random Forest: builds ensemble of decision trees (Breiman,
+            # 2001)
             model.fit(X_train, y_train)
 
             # Generate predictions on test set
@@ -259,21 +261,28 @@ class BaselineTrainer:
             with open(out / "models" / f"{name}.pkl", "wb") as f:
                 pickle.dump(model, f)
 
-            # Persist test set predictions for detailed error analysis
-            # Storing predictions alongside ground truth enables:
-            # - Residual analysis
-            # - Error distribution visualisation
-            # - Comparison with other models
-            #
-            # The 'model' column is included to support potential future
-            # consolidation of predictions from multiple models into a single
-            # DataFrame for comparative analysis (not currently used by
-            # evaluate.py but included for forward compatibility).
+            # Inverse scale targets before saving
+            with open(processed / "scaler_y.pkl", "rb") as f:
+                scaler_y = pickle.load(f)
+
+            y_test_inv = scaler_y.inverse_transform(
+                y_test.reshape(-1, 1)
+            ).flatten()
+
+            y_pred_inv = scaler_y.inverse_transform(
+                y_pred.reshape(-1, 1)
+            ).flatten()
+
             pred_df = pd.DataFrame({
-                "model": name,  # Model identifier (for potential future use)
-                "y_true": y_test,  # Ground truth SSI values
-                "y_pred": y_pred,  # Model predictions
+                "model": name,
+                "y_true": y_test_inv,
+                "y_pred": y_pred_inv,
             })
+
+            pred_df.to_csv(
+                out / "predictions" / f"{name}_test_predictions.csv",
+                index=False,
+            )
             pred_df.to_csv(
                 out / "predictions" / f"{name}_test_predictions.csv",
                 index=False,
