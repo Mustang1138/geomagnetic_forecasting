@@ -89,12 +89,12 @@ def train_lstm(data_dir="data/processed", num_epochs=None, batch_size=None):
     # Dataloaders
     train_ds = TensorDataset(
         torch.tensor(X_train, dtype=torch.float32),
-        torch.tensor(y_train, dtype=torch.float32),
+        torch.tensor(y_train, dtype=torch.float32).squeeze(-1),
     )
 
     val_ds = TensorDataset(
         torch.tensor(X_val, dtype=torch.float32),
-        torch.tensor(y_val, dtype=torch.float32),
+        torch.tensor(y_val, dtype=torch.float32).squeeze(-1),
     )
 
     if batch_size is None:
@@ -104,9 +104,10 @@ def train_lstm(data_dir="data/processed", num_epochs=None, batch_size=None):
         train_ds,
         batch_size=batch_size,
         shuffle=False,
+        pin_memory=True,
     )
 
-    val_loader = DataLoader(val_ds, batch_size=256, shuffle=False)
+    val_loader = DataLoader(val_ds, batch_size=256, shuffle=False, pin_memory=True)
 
     # Model initialisation
     input_size = X_train.shape[2]
@@ -193,7 +194,7 @@ def train_lstm(data_dir="data/processed", num_epochs=None, batch_size=None):
     test_npz_exists = (data_dir / "test.npz").exists()
     scaler_pkl_exists = (data_dir / "scaler_y.pkl").exists()
     if (test_npy_exists or test_npz_exists) and scaler_pkl_exists:
-        model.load_state_dict(torch.load(model_dir / "lstm_best.pt"))
+        model.load_state_dict(torch.load(model_dir / "lstm_best.pt", map_location=device))
         model.eval()
 
         if test_npy_exists:

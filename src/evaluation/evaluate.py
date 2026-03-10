@@ -25,6 +25,7 @@ from src.models.persistence import persistence_forecast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+plt.style.use("seaborn-v0_8-whitegrid")
 
 # Metric computation
 def compute_regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
@@ -65,6 +66,28 @@ def plot_scatter(y_true, y_pred, model_name, output_path):
     plt.xlabel("True SSI")
     plt.ylabel("Predicted SSI")
     plt.title(f"{model_name}: Predicted vs true SSI")
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+
+
+def plot_model_ranking(metrics_df, output_path):
+    """
+    Plot model ranking based on RMSE (lower is better).
+    """
+
+    df = metrics_df.sort_values("rmse")
+
+    plt.figure(figsize=(8, 5))
+
+    plt.bar(df["model"], df["rmse"])
+
+    plt.ylabel("RMSE (Storm Severity Index)")
+    plt.xlabel("Model")
+    plt.title("Model Performance Comparison (Lower RMSE = Better)")
+
+    plt.xticks(rotation=30)
+
     plt.tight_layout()
     plt.savefig(output_path)
     plt.close()
@@ -218,7 +241,7 @@ def evaluate_all_models(processed_dir: Path, results_dir: Path):
 
     # Evaluate temporal models
     temporal_rows = evaluate_temporal_models(results_dir)
-    temporal_df = pd.DataFrame(temporal_rows)
+    temporal_df = pd.DataFrame(temporal_rows) if temporal_rows else pd.DataFrame()
 
     # Combine
     all_metrics = pd.concat(
@@ -232,6 +255,11 @@ def evaluate_all_models(processed_dir: Path, results_dir: Path):
     all_metrics.to_csv(
         results_dir / "metrics_all_models.csv",
         index=False,
+    )
+
+    plot_model_ranking(
+        all_metrics,
+        results_dir / "model_ranking_rmse.png"
     )
 
     print("\nFinal Model Comparison:")
