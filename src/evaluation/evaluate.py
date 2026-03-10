@@ -162,6 +162,10 @@ def evaluate_baseline_models(processed_dir, results_dir):
         )
 
     metrics_df = pd.DataFrame(metrics_rows)
+    # Ensure 'model' is the first column so that callers reading the CSV with
+    # index_col=0 get the model name as the index rather than a metric column.
+    cols = ["model", "rmse", "mae", "r2"]
+    metrics_df = metrics_df[[c for c in cols if c in metrics_df.columns]]
     metrics_df.to_csv(results_dir / "metrics_baselines.csv", index=False)
 
 

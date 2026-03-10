@@ -14,10 +14,12 @@ References:
 - Pedregosa et al. (2011) - scikit-learn testing patterns
 """
 
+import pickle
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 from src.models.baseline_models import BaselineTrainer
 
@@ -49,6 +51,11 @@ def _make_dummy_dataset(path: Path, n: int = 50):
     These ranges loosely reflect the physical parameters but are not
     intended to be realistic. The purpose is to test code functionality,
     not scientific validity.
+
+    A dummy scaler_y.pkl is also written to the parent directory on the
+    first call, mimicking the artefact produced by the preprocessing
+    pipeline.  The scaler is fitted on the generated SSI column so that
+    inverse_transform calls in baseline_models.py succeed during tests.
     """
     # Generate synthetic data with appropriate feature distributions
     df = pd.DataFrame({
@@ -60,6 +67,18 @@ def _make_dummy_dataset(path: Path, n: int = 50):
 
     # Save to CSV (mimics preprocessed baseline data format)
     df.to_csv(path, index=False)
+
+    # Write a dummy scaler_y.pkl fitted on this dataset's SSI column.
+    # baseline_models.py expects this file to be present in the processed
+    # directory so it can inverse-transform scaled predictions before saving.
+    # We only write it once (when train_baseline.csv is created) to avoid
+    # overwriting with a differently-fitted scaler from the test-set call.
+    scaler_path = path.parent / "scaler_y.pkl"
+    if not scaler_path.exists():
+        scaler_y = StandardScaler()
+        scaler_y.fit(df[["storm_severity_index"]])
+        with open(scaler_path, "wb") as f:
+            pickle.dump(scaler_y, f)
 
 
 def test_baseline_models_train_and_predict(tmp_path):

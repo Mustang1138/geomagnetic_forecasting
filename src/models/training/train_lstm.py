@@ -56,11 +56,12 @@ class LSTMRegressor(nn.Module):
 
         # Use final time-step representation
         out = out[:, -1, :]
-        return self.fc(out)
+        # Squeeze to (N,) - consistent shape for training loss and inference
+        return self.fc(out).squeeze(-1)
 
 
 # Training Function
-def train_lstm(data_dir="data/processed"):
+def train_lstm(data_dir="data/processed", num_epochs=None, batch_size=None):
 
     config = load_config()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,15 +69,22 @@ def train_lstm(data_dir="data/processed"):
 
     data_dir = Path(data_dir)
 
-    # Load preprocessed arrays
-    X_train = np.load(data_dir / "X_train.npy")
-    y_train = np.load(data_dir / "y_train.npy")
+    # Flexible loading for .npy or .npz formats
+    try:
+        X_train = np.load(data_dir / "X_train.npy")
+        y_train = np.load(data_dir / "y_train.npy")
+    except FileNotFoundError:
+        with np.load(data_dir / "train.npz") as data:
+            X_train = data['X']
+            y_train = data['y']
 
-    X_val = np.load(data_dir / "X_val.npy")
-    y_val = np.load(data_dir / "y_val.npy")
-
-    X_test = np.load(data_dir / "X_test.npy")
-    y_test = np.load(data_dir / "y_test.npy")
+    try:
+        X_val = np.load(data_dir / "X_val.npy")
+        y_val = np.load(data_dir / "y_val.npy")
+    except FileNotFoundError:
+        with np.load(data_dir / "val.npz") as data:
+            X_val = data['X']
+            y_val = data['y']
 
     # Dataloaders
     train_ds = TensorDataset(
@@ -89,9 +97,12 @@ def train_lstm(data_dir="data/processed"):
         torch.tensor(y_val, dtype=torch.float32),
     )
 
+    if batch_size is None:
+        batch_size = config["models"]["lstm"]["batch_size"]
+
     train_loader = DataLoader(
         train_ds,
-        batch_size=config["models"]["lstm"]["batch_size"],
+        batch_size=batch_size,
         shuffle=False,
     )
 
@@ -121,8 +132,11 @@ def train_lstm(data_dir="data/processed"):
     patience = 8
     patience_counter = 0
 
+    if num_epochs is None:
+        num_epochs = config["models"]["lstm"]["epochs"]
+
     # Training Loop
-    for epoch in range(config["models"]["lstm"]["epochs"]):
+    for epoch in range(num_epochs):
 
         model.train()
         train_loss = 0.0
@@ -170,35 +184,57 @@ def train_lstm(data_dir="data/processed"):
                 logger.info("Early stopping triggered.")
                 break
 
-    # Test Inference
-    model.load_state_dict(torch.load(model_dir / "lstm_best.pt"))
-    model.eval()
+    # Test Inference (only if test data exists)
+    test_npy_exists = (
+                              data_dir /
+                              "X_test.npy").exists() and (
+                              data_dir /
+                              "y_test.npy").exists()
+    test_npz_exists = (data_dir / "test.npz").exists()
+    scaler_pkl_exists = (data_dir / "scaler_y.pkl").exists()
+    if (test_npy_exists or test_npz_exists) and scaler_pkl_exists:
+        model.load_state_dict(torch.load(model_dir / "lstm_best.pt"))
+        model.eval()
 
-    X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
+        if test_npy_exists:
+            X_test = np.load(data_dir / "X_test.npy")
+            y_test = np.load(data_dir / "y_test.npy")
+        elif test_npz_exists:
+            with np.load(data_dir / "test.npz") as data:
+                X_test = data['X']
+                y_test = data['y']
 
-    with torch.no_grad():
-        preds = model(X_test_tensor).cpu().numpy()
+        X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
 
-    # Inverse Scaling
-    with open(data_dir / "scaler_y.pkl", "rb") as f:
-        scaler_y = pickle.load(f)
+        with torch.no_grad():
+            preds = model(X_test_tensor).cpu().numpy()
 
-    y_test_inv = scaler_y.inverse_transform(y_test.reshape(-1, 1))
-    preds_inv = scaler_y.inverse_transform(preds.reshape(-1, 1))
+        # Inverse Scaling
+        with open(data_dir / "scaler_y.pkl", "rb") as f:
+            scaler_y = pickle.load(f)
 
-    # Save Predictions
-    pred_dir = Path("outputs/temporal/predictions")
-    pred_dir.mkdir(parents=True, exist_ok=True)
+        y_test_inv = scaler_y.inverse_transform(y_test.reshape(-1, 1))
+        preds_inv = scaler_y.inverse_transform(preds.reshape(-1, 1))
 
-    df_preds = pd.DataFrame({
-        "y_true": y_test_inv.flatten(),
-        "y_pred": preds_inv.flatten(),
-    })
+        # Save Predictions
+        pred_dir = Path("outputs/temporal/predictions")
+        pred_dir.mkdir(parents=True, exist_ok=True)
 
-    df_preds.to_csv(pred_dir / "lstm_predictions.csv", index=False)
+        df_preds = pd.DataFrame({
+            "y_true": y_test_inv.flatten(),
+            "y_pred": preds_inv.flatten(),
+        })
 
-    logger.info("LSTM training and inference complete.")
+        df_preds.to_csv(pred_dir / "lstm_predictions.csv", index=False)
 
+        logger.info("LSTM training and inference complete.")
+    else:
+        logger.info(
+            "LSTM training complete (skipping inference due to missing test data).")
+
+    # Move model back to CPU before returning so callers (e.g. tests)
+    # can run inference with plain CPU tensors without a device mismatch.
+    model = model.cpu()
     return model
 
 

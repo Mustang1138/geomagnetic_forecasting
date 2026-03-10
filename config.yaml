@@ -67,6 +67,15 @@ models:
     batch_size: 32
     learning_rate: 0.001
 
+  gru:
+    hidden_size: 64
+    num_layers: 2
+    dropout: 0.2
+    sequence_length: 6
+    epochs: 50
+    batch_size: 32
+    learning_rate: 0.001
+
 # Training configuration
 training:
   test_split: 0.15
