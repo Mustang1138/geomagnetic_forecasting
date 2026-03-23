@@ -126,6 +126,44 @@ def plot_feature_importance(model, feature_names, output_path):
     plt.close()
 
 
+def plot_residuals(y_true, y_pred, model_name, output_path):
+    """
+    Residual scatter: predicted vs residuals.
+    """
+    residuals = y_true - y_pred
+
+    plt.figure(figsize=(6, 5))
+    plt.scatter(y_pred, residuals, alpha=0.4)
+
+    plt.axhline(0, linestyle="--", linewidth=2)
+
+    plt.xlabel("Predicted SSI")
+    plt.ylabel("Residual (True - Predicted)")
+    plt.title(f"{model_name}: Residual Plot")
+
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+
+
+def plot_residual_distribution(y_true, y_pred, model_name, output_path):
+    """
+    Histogram of residuals.
+    """
+    residuals = y_true - y_pred
+
+    plt.figure(figsize=(6, 5))
+    plt.hist(residuals, bins=50)
+
+    plt.xlabel("Residual (True - Predicted)")
+    plt.ylabel("Frequency")
+    plt.title(f"{model_name}: Residual Distribution")
+
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+
+
 # Baseline evaluation
 def evaluate_baseline_models(processed_dir, results_dir):
 
@@ -176,6 +214,20 @@ def evaluate_baseline_models(processed_dir, results_dir):
             y_pred,
             model_name,
             plots_dir / f"{model_name}_scatter.png",
+        )
+
+        plot_residuals(
+            y_true,
+            y_pred,
+            model_name,
+            plots_dir / f"{model_name}_residuals.png",
+        )
+
+        plot_residual_distribution(
+            y_true,
+            y_pred,
+            model_name,
+            plots_dir / f"{model_name}_residual_hist.png",
         )
 
         # Feature importance (only for Random Forest)
@@ -289,6 +341,20 @@ def evaluate_temporal_models(results_dir):
             y_pred,
             model_name,
             plots_dir / f"{model_name}_scatter.png",
+        )
+
+        plot_residuals(
+            y_true,
+            y_pred,
+            model_name,
+            plots_dir / f"{model_name}_residuals.png",
+        )
+
+        plot_residual_distribution(
+            y_true,
+            y_pred,
+            model_name,
+            plots_dir / f"{model_name}_residual_hist.png",
         )
 
     return metrics_rows
