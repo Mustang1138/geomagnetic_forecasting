@@ -28,6 +28,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 plt.style.use("seaborn-v0_8-whitegrid")
 
 # Metric computation
+
+
 def compute_regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     """
     Compute RMSE, MAE and R² in physical SSI units.
@@ -93,6 +95,37 @@ def plot_model_ranking(metrics_df, output_path):
     plt.close()
 
 
+def plot_feature_importance(model, feature_names, output_path):
+    """
+    Plot feature importance for tree-based models.
+    """
+
+    if not hasattr(model, "feature_importances_"):
+        return
+
+    importances = model.feature_importances_
+
+    # 🔥 FIX: align lengths
+    if len(feature_names) != len(importances):
+        feature_names = feature_names[:len(importances)]
+
+    df = pd.DataFrame({
+        "feature": feature_names,
+        "importance": importances
+    }).sort_values("importance", ascending=False)
+
+    plt.figure(figsize=(8, 5))
+    plt.barh(df["feature"], df["importance"])
+    plt.gca().invert_yaxis()
+
+    plt.xlabel("Importance")
+    plt.title("Feature Importance (Random Forest)")
+
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+
+
 # Baseline evaluation
 def evaluate_baseline_models(processed_dir, results_dir):
 
@@ -144,6 +177,35 @@ def evaluate_baseline_models(processed_dir, results_dir):
             model_name,
             plots_dir / f"{model_name}_scatter.png",
         )
+
+        # Feature importance (only for Random Forest)
+        if model_name == "random_forest":
+            model_path = results_dir / "baselines" / "models" / "random_forest.pkl"
+
+            if model_path.exists():
+                with open(model_path, "rb") as f:
+                    model = pickle.load(f)
+
+                # Load feature names from baseline dataset
+                train_csv = processed_dir / "train_baseline.csv"
+                if train_csv.exists():
+                    df_train = pd.read_csv(train_csv)
+
+                    feature_cols = [
+                        col for col in df_train.columns
+                        if col not in [
+                            "datetime",
+                            "storm_severity_index",
+                            "storm_severity_class",
+                            "auroral_latitude_deg"
+                        ]
+                    ]
+
+                    plot_feature_importance(
+                        model,
+                        feature_cols,
+                        plots_dir / "random_forest_feature_importance.png"
+                    )
 
     # Persistence baseline (computed fresh here)
     test_csv = processed_dir / "test_baseline.csv"
@@ -241,7 +303,8 @@ def evaluate_all_models(processed_dir: Path, results_dir: Path):
 
     # Evaluate temporal models
     temporal_rows = evaluate_temporal_models(results_dir)
-    temporal_df = pd.DataFrame(temporal_rows) if temporal_rows else pd.DataFrame()
+    temporal_df = pd.DataFrame(
+        temporal_rows) if temporal_rows else pd.DataFrame()
 
     # Combine
     all_metrics = pd.concat(
