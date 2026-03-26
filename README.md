@@ -222,5 +222,3 @@ MIT Licence – Academic research project for Edge Hill University.
 ---
 
 *Last updated: March 2026*
-
-```
