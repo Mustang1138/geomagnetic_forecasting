@@ -18,16 +18,8 @@ ENV/
 *.iml
 
 # Data (don't commit large datasets)
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
+/data/
 
-# Results
-outputs/plots/*
-outputs/metrics/*
-!outputs/plots/.gitkeep
-!outputs/metrics/.gitkeep
 
 # Jupyter
 .ipynb_checkpoints/
@@ -57,3 +49,6 @@ logs/
 *.tmp
 *.bak
 *~
+
+# Results and Trained Models
+/outputs/

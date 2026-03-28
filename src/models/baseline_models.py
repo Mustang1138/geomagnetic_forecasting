@@ -44,10 +44,12 @@ class BaselineTrainer:
     model evaluation (Cerqueira et al., 2020).
     """
 
-    # Feature columns used for prediction
-    # These correspond to key solar wind parameters that drive geomagnetic activity
-    # (Burton et al., 1975; Gonzalez et al., 1994)
-    FEATURE_COLS = ["bz_gsm", "speed", "density"]
+    # Feature columns must match those used in DataPreprocessor.FEATURE_COLS
+    # exactly — using a different subset would make baseline performance
+    # incomparable with the temporal models (Cerqueira et al., 2020).
+    # dst is included as it is the dominant SSI driver and is available
+    # at prediction time without constituting data leakage.
+    FEATURE_COLS = ["bt", "bz_gsm", "speed", "density", "dst"]
 
     # Target variable: continuous Storm Severity Index in [0, 1]
     TARGET_COL = "storm_severity_index"

@@ -80,7 +80,12 @@ class DataPreprocessor:
 
     # Input features used by ML models.
     # Bt is included as an explicit coupling/energy term alongside Bz.
-    FEATURE_COLS = ["bt", "bz_gsm", "speed", "density"]
+    # dst is included as a direct input feature because it is the dominant
+    # component of SSI (weight 0.35) and provides the models with explicit
+    # access to the primary geomagnetic response signal. At prediction time,
+    # the current Dst reading is genuinely available before the next
+    # timestep's SSI is observed, so this does not constitute data leakage.
+    FEATURE_COLS = ["bt", "bz_gsm", "speed", "density", "dst"]
 
     # Target variable: continuous Storm Severity Index
     TARGET_COL = "storm_severity_index"
@@ -157,10 +162,9 @@ class DataPreprocessor:
         # This is critical for meaningful forward/backward propagation
         df = df.sort_values("datetime").reset_index(drop=True)
 
-        # Specify columns to fill
-        # Include both features and Dst (needed for derived feature
-        # computation)
-        cols = self.FEATURE_COLS + ["dst"]
+        # Fill all feature columns — dst is now included in FEATURE_COLS
+        # so no additional columns are needed here.
+        cols = self.FEATURE_COLS
 
         # Forward-fill followed by backward-fill ensures gaps at both
         # ends of the series are handled deterministically.

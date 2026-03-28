@@ -9,7 +9,7 @@ data:
     # Long temporal baselines are recommended for geomagnetic modelling
     # to capture multiple solar cycles (Papitashvili and King, 2020).
     start: "2000-01-01"
-    end: "2026-02-02"
+    end: "auto" # Resolves to the last day of the previous month at runtime
 
   # Raw and processed directories are configurable to avoid hard-coded paths,
   # supporting portability across environments (PEP 8, 2001).
@@ -60,21 +60,23 @@ models:
     # for temporal dependency modelling in geomagnetic forecasting
     # (Hochreiter and Schmidhuber, 1997; Zou et al., 2024).
     hidden_size: 64
-    num_layers: 2
+    num_layers: 1
     dropout: 0.2
-    sequence_length: 6
+    sequence_length: 12
     epochs: 50
     batch_size: 32
-    learning_rate: 0.001
+    learning_rate: 0.0005
+    patience: 15
 
   gru:
-    hidden_size: 64
-    num_layers: 2
+    hidden_size: 128
+    num_layers: 1
     dropout: 0.2
-    sequence_length: 6
+    sequence_length: 24
     epochs: 50
     batch_size: 32
     learning_rate: 0.001
+    patience: 15
 
 # Training configuration
 training:
