@@ -3,9 +3,10 @@ Utility functions for the geomagnetic forecasting project.
 """
 
 import logging
+import pickle
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Union
+from typing import Any, Dict, Union
 
 import yaml
 
@@ -96,6 +97,30 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
         raise KeyError(f"Invalid configuration structure: {err}")
 
     return cfg
+
+
+def load_pickle(path: Path) -> Any:
+    """Deserialise a pickle file from disk.
+
+    A single shared loader eliminates the near-duplicate ``_load_pickle``
+    and ``load_scaler`` helpers that previously existed across modules.
+
+    Args:
+        path: Path to the ``.pkl`` file.
+
+    Returns:
+        The deserialised object.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+    """
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Artefact not found: {path}. "
+            "Ensure all preprocessing and training steps have been run."
+        )
+    with open(path, "rb") as fh:
+        return pickle.load(fh)
 
 
 def ensure_dir(directory: Union[str, Path]) -> Path:
