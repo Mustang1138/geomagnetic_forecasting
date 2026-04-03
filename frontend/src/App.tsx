@@ -4,10 +4,11 @@ import TimelineChart from './components/TimelineChart'
 import ModelSelector from './components/ModelSelector'
 import StatsPanel from './components/StatsPanel'
 import Controls from './components/Controls'
+import ForecastTab from './components/ForecastTab'
 import {useModels, usePredictions, useSnapshot} from './hooks/usePredictions'
 import type {ModelKey} from './utils'
 
-// Styles – structural layout only, no decorative tokens
+// Styles
 
 const s = {
     root: {
@@ -23,6 +24,22 @@ const s = {
         padding: '8px 12px', borderBottom: '1px solid #ccc',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     },
+
+    tabBar: {
+        display: 'flex',
+        borderBottom: '1px solid #ccc',
+    },
+
+    tab: (active: boolean) => ({
+        padding: '6px 20px',
+        cursor: 'pointer',
+        border: 'none',
+        borderBottom: active ? '2px solid #38bdf8' : '2px solid transparent',
+        background: 'transparent',
+        color: active ? '#38bdf8' : 'inherit',
+        fontWeight: active ? 'bold' as const : 'normal' as const,
+        fontSize: 13,
+    }),
 
     controlsBar: {
         padding: '6px 12px', borderBottom: '1px solid #ccc',
@@ -57,15 +74,22 @@ const s = {
 
 // Helpers
 
-/** Converts storm-class entries to percentage positions for timeline tick marks. */
+/**
+ * Converts storm-class entries to percentage positions for timeline tick marks.
+ * Only steps classified as moderate (``'m'``) receive a visible marker.
+ */
 function buildMarkers(cl?: string[]): number[] {
     if (!cl) return []
-    return cl.flatMap((c, i) => c === 'm' ? [(i / (cl.length - 1)) * 100] : [])
+    return cl
+        .map((c, i) => ({c, pct: (i / (cl.length - 1)) * 100}))
+        .filter(({c}) => c === 'm')
+        .map(({pct}) => pct)
 }
 
 // Component
 
 export default function App() {
+    const [activeTab, setActiveTab] = useState<'history' | 'forecast'>('history')
     const [activeModel, setActiveModel] = useState<ModelKey>('rf')
     const [currentIdx, setCurrentIdx] = useState(0)
     const [view, setView] = useState<'north' | 'south' | 'rect'>('north')
@@ -79,17 +103,21 @@ export default function App() {
 
     const playRef = useRef<number | null>(null)
 
-    // Derived display values for the current timestep
     const n = data?.n ?? 0
     const dt = data?.dt?.[currentIdx] ?? '—'
     const currentSSI = data?.pred[currentIdx] ?? 0
     const currentLat = data?.lat?.[currentIdx] ?? 63
 
+    // Initialise markers once when prediction data first arrives.
+    // A ref guards against re-initialising on subsequent data identity changes.
+    const markersInitialised = useRef(false)
     useEffect(() => {
-        if (data && !markers.length) setMarkers(buildMarkers(data.cl))
+        if (data && !markersInitialised.current) {
+            markersInitialised.current = true
+            setMarkers(buildMarkers(data.cl))
+        }
     }, [data])
 
-    /* Advance the playhead by one step, stopping at the end of the dataset. */
     const tick = useCallback(() => {
         setCurrentIdx(prev => {
             const next = prev + 1
@@ -101,20 +129,17 @@ export default function App() {
         })
     }, [data])
 
-    /* Reschedule the loop whenever playing state, speed, or tick changes. */
     useEffect(() => {
         if (!playing) {
             playRef.current && clearTimeout(playRef.current);
             return
         }
-
         const ms = Math.max(30, 300 / speed)
         const loop = () => {
             tick();
             playRef.current = setTimeout(loop, ms)
         }
         playRef.current = setTimeout(loop, ms)
-
         return () => {
             playRef.current && clearTimeout(playRef.current)
         }
@@ -125,6 +150,12 @@ export default function App() {
         setCurrentIdx(idx)
     }, [])
 
+    // Stop playback when switching tabs
+    const handleTabChange = useCallback((tab: 'history' | 'forecast') => {
+        setPlaying(false)
+        setActiveTab(tab)
+    }, [])
+
     return (
         <div style={s.root}>
             <div style={s.container}>
@@ -133,56 +164,90 @@ export default function App() {
                 <header style={s.header}>
                     <strong>AURORA/CAST</strong>
                     <small>
-                        {loading ? 'Loading predictions…' : !data ? 'API unavailable' : (
-                            <>Test set: Feb 2021 – Feb 2026 · {n} steps (6-hr)<br/>{dt}</>
-                        )}
+                        {activeTab === 'history'
+                            ? loading
+                                ? 'Loading predictions…'
+                                : !data
+                                    ? 'API unavailable'
+                                    : <>Test set: Feb 2021 – Feb 2026 · {n} steps (6-hr)<br/>{dt}</>
+                            : '7-day forecast · Real-time DSCOVR · 6-hour steps'
+                        }
                     </small>
                 </header>
 
-                {/* Controls bar */}
-                <div style={s.controlsBar}>
-                    <ModelSelector activeModel={activeModel} models={models} onSelect={setActiveModel}/>
-                    <Controls
-                        playing={playing} speed={speed} view={view}
-                        onTogglePlay={() => data && setPlaying(p => !p)}
-                        onSpeed={setSpeed}
-                        onView={setView}
-                    />
+                {/* Tab bar */}
+                <div style={s.tabBar}>
+                    <button
+                        style={s.tab(activeTab === 'history')}
+                        onClick={() => handleTabChange('history')}
+                    >
+                        History
+                    </button>
+                    <button
+                        style={s.tab(activeTab === 'forecast')}
+                        onClick={() => handleTabChange('forecast')}
+                    >
+                        Forecast
+                    </button>
                 </div>
 
-                {/* Main */}
-                <div style={s.main}>
-                    <div style={s.mapArea}>
-                        {loading ? <p style={{padding: 8}}>Loading predictions…</p>
-                            : <AuroralMap ssi={currentSSI} aLat={currentLat} view={view}/>}
-                    </div>
-                    <div style={s.sidebar}>
-                        <StatsPanel snapshot={snapshot} activeModel={activeModel} onSelectModel={setActiveModel}/>
-                    </div>
-                </div>
+                {/* Forecast tab */}
+                {activeTab === 'forecast' && <ForecastTab/>}
 
-                {/* Timeline */}
-                <div style={s.timelineBar}>
-                    <div style={s.tlRow}>
-                        <span>{dt}</span>
-                        <span style={s.tlIdx}>{n > 0 ? `${currentIdx + 1} / ${n}` : ''}</span>
-                    </div>
+                {/* History tab */}
+                {activeTab === 'history' && <>
 
-                    {/* Storm-event tick marks above the scrubber */}
-                    <div style={s.markersWrap}>
-                        {markers.map((pct, i) => <div key={i} style={s.marker(pct)}/>)}
+                    {/* Controls bar */}
+                    <div style={s.controlsBar}>
+                        <ModelSelector activeModel={activeModel} models={models} onSelect={setActiveModel}/>
+                        <Controls
+                            playing={playing} speed={speed} view={view}
+                            onTogglePlay={() => data && setPlaying(p => !p)}
+                            onSpeed={setSpeed}
+                            onView={setView}
+                        />
                     </div>
 
-                    <input
-                        type="range" min={0} max={Math.max(0, n - 1)} value={currentIdx}
-                        onChange={e => handleSeek(Number(e.target.value))}
-                        style={{width: '100%'}}
-                    />
+                    {/* Main */}
+                    <div style={s.main}>
+                        <div style={s.mapArea}>
+                            {loading
+                                ? <p style={{padding: 8}}>Loading predictions…</p>
+                                : <AuroralMap ssi={currentSSI} aLat={currentLat} view={view}/>
+                            }
+                        </div>
+                        <div style={s.sidebar}>
+                            <StatsPanel snapshot={snapshot} activeModel={activeModel} onSelectModel={setActiveModel}/>
+                        </div>
+                    </div>
 
-                    {data && (
-                        <TimelineChart data={data} modelKey={activeModel} currentIdx={currentIdx} onSeek={handleSeek}/>
-                    )}
-                </div>
+                    {/* Timeline */}
+                    <div style={s.timelineBar}>
+                        <div style={s.tlRow}>
+                            <span>{dt}</span>
+                            <span style={s.tlIdx}>{n > 0 ? `${currentIdx + 1} / ${n}` : ''}</span>
+                        </div>
+
+                        <div style={s.markersWrap}>
+                            {markers.map((pct, i) => <div key={i} style={s.marker(pct)}/>)}
+                        </div>
+
+                        <input
+                            type="range" min={0} max={Math.max(0, n - 1)} value={currentIdx}
+                            onChange={e => handleSeek(Number(e.target.value))}
+                            style={{width: '100%'}}
+                        />
+
+                        {data && (
+                            <TimelineChart
+                                data={data}
+                                modelKey={activeModel}
+                                currentIdx={currentIdx}
+                                onSeek={handleSeek}
+                            />
+                        )}
+                    </div>
+                </>}
 
             </div>
         </div>
