@@ -21,6 +21,8 @@ logger = setup_logging()
 def train_gru(
         data_dir: str = "data/processed",
         output_dir: str = "outputs/temporal",
+        num_epochs: int | None = None,
+        batch_size: int | None = None,
 ) -> None:
     """Train the GRU regressor using configuration from ``config.yaml``.
 
@@ -29,6 +31,8 @@ def train_gru(
             ``scaler_y.pkl``.
         output_dir: Directory to which the model checkpoint and prediction
             CSV are written.
+        num_epochs: Override the epoch count from config (used in testing).
+        batch_size: Override the batch size from config (used in testing).
     """
     config = load_config()
     gru_cfg = config["models"]["gru"]
@@ -39,10 +43,14 @@ def train_gru(
         num_layers=gru_cfg["num_layers"],
         dropout=gru_cfg["dropout"],
         learning_rate=gru_cfg["learning_rate"],
-        batch_size=gru_cfg["batch_size"],
-        epochs=gru_cfg["epochs"],
+        batch_size=batch_size if batch_size is not None else gru_cfg["batch_size"],
+        epochs=num_epochs if num_epochs is not None else gru_cfg["epochs"],
+        patience=gru_cfg["patience"],
         data_dir=Path(data_dir),
         output_dir=Path(output_dir),
+        # Load GRU-specific sequence arrays (X_train_gru.npy etc.) generated
+        # by preprocess.py using the GRU sequence_length from config.yaml.
+        data_prefix="gru",
     )
 
     trainer = Trainer(model_class=GRURegressor, cfg=cfg)

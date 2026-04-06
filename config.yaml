@@ -16,18 +16,25 @@ data:
   raw_dir: "data/raw"
   processed_dir: "data/processed"
 
+  # Resample OMNI2 training data to 6-hourly averages before preprocessing.
+  # This ensures the training cadence matches the real-time DSCOVR inference
+  # pipeline, which resamples to 6-hourly in realtime_pipeline.py.
+  # A mismatch between training and inference cadences degrades forecast
+  # reliability and constitutes a form of distribution shift
+  # (Cristoforetti et al., 2022).
+  resample_6h: true
+
   urls:
     dscovr:
-      # Real-time DSCOVR solar wind data is used for exploratory analysis only,
-      # as real-time streams are noisier and less stable than curated datasets
-      # (NOAA SWPC, 2024; Cristoforetti et al., 2022).
+      # Real-time DSCOVR solar wind data is used for live forecasting only.
+      # It is excluded from model training to avoid inconsistencies between
+      # historical and operational data streams (Cristoforetti et al., 2022).
       mag: "https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json"
       plasma: "https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json"
 
     omni2:
-      # OMNI2 provides long-term, hourly-averaged solar wind and geomagnetic data,
-      # widely used in space weather research (Papitashvili and King,
-      # 2005).
+      # OMNI2 provides long-term, hourly-averaged solar wind and geomagnetic
+      # data, widely used in space weather research (Papitashvili and King, 2005).
       base_url: "https://spdf.gsfc.nasa.gov/pub/data/omni/low_res_omni/"
       filename_pattern: "omni2_{year}.dat"
 
@@ -40,7 +47,7 @@ data:
   dscovr:
     provider: "NOAA SWPC"
     window_days: 7
-    usage: "exploration_only"
+    usage: "forecasting_only"
 
 # Model configurations
 models:
@@ -56,9 +63,8 @@ models:
       random_state: 42
 
   lstm:
-    # LSTM architecture parameters follow established practice
-    # for temporal dependency modelling in geomagnetic forecasting
-    # (Hochreiter and Schmidhuber, 1997; Zou et al., 2024).
+    # NOTE: these values are starting defaults. Run tune.py to find the
+    # optimal values for the dataset, then update this section.
     hidden_size: 64
     num_layers: 1
     dropout: 0.2
@@ -69,14 +75,16 @@ models:
     patience: 15
 
   gru:
-    hidden_size: 128
-    num_layers: 1
+    # NOTE: these values are starting defaults. Run tune.py to find the
+    # optimal values for the dataset, then update this section.
+    hidden_size: 64
+    num_layers: 2
     dropout: 0.2
-    sequence_length: 24
+    sequence_length: 12
     epochs: 50
     batch_size: 32
     learning_rate: 0.001
-    patience: 15
+    patience: 8
 
 # Training configuration
 training:
@@ -84,7 +92,7 @@ training:
   validation_split: 0.15
   random_seed: 42  # Used for model reproducibility (not for time splits)
 
-# Data physical limits
+# Data physical limits — used for outlier removal during preprocessing
 physical_limits:
   bt: [ 0.0, 5.0 ]  # nT - |<B>|  (Bt)
   bz_gsm: [ -50, 50 ]  # nT - IMF Bz component

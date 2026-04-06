@@ -42,6 +42,10 @@ class TrainingConfig:
             and ``scaler_y.pkl``.
         output_dir: Directory to which the best model checkpoint and
             prediction CSV are written.
+        data_prefix: Model-specific suffix used to select the correct set
+            of sequence arrays (e.g. ``"lstm"`` loads ``X_train_lstm.npy``).
+            Falls back to the legacy unprefixed filenames if no prefixed
+            file is found, preserving backwards compatibility.
     """
 
     model_name: str
@@ -54,6 +58,11 @@ class TrainingConfig:
     patience: int = 16
     data_dir: Path = field(default_factory=lambda: Path("data/processed"))
     output_dir: Path = field(default_factory=lambda: Path("outputs/temporal"))
+    # Model-specific prefix for sequence array filenames.
+    # Enables LSTM and GRU to load their own independently generated
+    # sequence arrays (e.g. X_train_lstm.npy vs X_train_gru.npy),
+    # ensuring each model trains on windows of the correct length.
+    data_prefix: str = ""
 
 
 # Data loading helpers
@@ -61,36 +70,50 @@ class TrainingConfig:
 def _load_split(
         data_dir: Path,
         split: str,
+        prefix: str = "",
 ) -> tuple[np.ndarray, np.ndarray]:
     """Load a preprocessed split from disk.
 
-    Supports both the ``.npy`` format produced by ``preprocess.py`` and the
-    ``.npz`` archive format produced by ``sequence_datasets.py``.
+    Lookup order:
+        1. Prefixed ``.npy`` files (e.g. ``X_train_lstm.npy``) — preferred,
+           ensures each model loads its own independently windowed arrays.
+        2. Unprefixed ``.npy`` files (legacy fallback — e.g. ``X_train.npy``).
+        3. ``.npz`` archive (legacy fallback).
 
     Args:
         data_dir: Directory containing the preprocessed arrays.
         split: One of ``"train"``, ``"val"``, or ``"test"``.
+        prefix: Optional model-specific suffix (e.g. ``"lstm"`` or ``"gru"``).
+            When provided, prefixed files are tried first.
 
     Returns:
         A tuple ``(X, y)`` of NumPy arrays.
 
     Raises:
-        FileNotFoundError: If neither the ``.npy`` nor the ``.npz`` files
-            exist for the requested split.
+        FileNotFoundError: If no suitable files exist for the requested split.
     """
+    # 1. Prefixed .npy files (model-specific arrays)
+    if prefix:
+        npy_x = data_dir / f"X_{split}_{prefix}.npy"
+        npy_y = data_dir / f"y_{split}_{prefix}.npy"
+        if npy_x.exists() and npy_y.exists():
+            return np.load(npy_x), np.load(npy_y)
+
+    # 2. Legacy unprefixed .npy files
     npy_x = data_dir / f"X_{split}.npy"
     npy_y = data_dir / f"y_{split}.npy"
-
     if npy_x.exists() and npy_y.exists():
         return np.load(npy_x), np.load(npy_y)
 
+    # 3. Legacy .npz archive
     npz = data_dir / f"{split}.npz"
     if npz.exists():
         with np.load(npz) as archive:
             return archive["X"], archive["y"]
 
     raise FileNotFoundError(
-        f"No preprocessed data found for split '{split}' in {data_dir}. "
+        f"No preprocessed data found for split '{split}' "
+        f"(prefix='{prefix}') in {data_dir}. "
         "Run the preprocessing pipeline first."
     )
 
@@ -208,7 +231,7 @@ def run_inference(
         scaler_y_path: Path,
         device: torch.device,
 ) -> pd.DataFrame:
-    """Generate test-set predictions and inverse-scale them.
+    """Generate test-set predictions and inverse-scale them to physical units.
 
     Args:
         model: Trained model in eval mode.
@@ -242,10 +265,9 @@ def run_inference(
 class Trainer:
     """Orchestrates training, early stopping, and inference for a recurrent model.
 
-    Designed to be model-agnostic — any :class:`~torch.nn.Module` whose
-    ``forward`` method accepts a tensor of shape
-    ``(batch, seq_len, n_features)`` and returns a tensor of shape
-    ``(batch,)`` is compatible.
+    Model-agnostic: any :class:`~torch.nn.Module` whose ``forward`` method
+    accepts a tensor of shape ``(batch, seq_len, n_features)`` and returns
+    a tensor of shape ``(batch,)`` is compatible.
 
     Args:
         model_class: The recurrent model class to instantiate
@@ -264,17 +286,20 @@ class Trainer:
     def run(self) -> nn.Module:
         """Execute the full training pipeline.
 
-        Loads data, trains with early stopping, runs test inference, saves
-        predictions, and returns the best model moved to CPU.
+        Loads model-specific sequence arrays, trains with early stopping,
+        runs test inference, saves predictions, and returns the best model.
 
         Returns:
             The trained model with the best validation weights, on CPU.
         """
         cfg = self._cfg
 
-        # Load data
-        X_train, y_train = _load_split(cfg.data_dir, "train")
-        X_val, y_val = _load_split(cfg.data_dir, "val")
+        # Load model-specific sequence arrays.
+        # cfg.data_prefix (e.g. "lstm" or "gru") selects the correct set
+        # of .npy files, ensuring each model trains on windows of the
+        # sequence length it was configured for.
+        X_train, y_train = _load_split(cfg.data_dir, "train", cfg.data_prefix)
+        X_val, y_val = _load_split(cfg.data_dir, "val", cfg.data_prefix)
 
         train_loader = build_dataloader(X_train, y_train, cfg.batch_size)
         val_loader = build_dataloader(X_val, y_val, batch_size=256)
@@ -310,10 +335,7 @@ class Trainer:
 
             logger.info(
                 "Epoch %d/%d — train: %.6f  val: %.6f",
-                epoch + 1,
-                cfg.epochs,
-                train_loss,
-                val_loss,
+                epoch + 1, cfg.epochs, train_loss, val_loss,
             )
 
             if val_loss < best_val_loss:
@@ -337,7 +359,7 @@ class Trainer:
         scaler_path = cfg.data_dir / "scaler_y.pkl"
 
         try:
-            X_test, y_test = _load_split(cfg.data_dir, "test")
+            X_test, y_test = _load_split(cfg.data_dir, "test", cfg.data_prefix)
         except FileNotFoundError:
             logger.warning(
                 "Test data not found — skipping inference for %s.",
@@ -367,6 +389,4 @@ class Trainer:
             pred_path,
         )
 
-        # Return to CPU so callers can run inference without device
-        # mismatch (e.g. in unit tests running on CPU-only machines).
         return model.cpu()

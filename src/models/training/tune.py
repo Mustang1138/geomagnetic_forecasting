@@ -4,14 +4,23 @@ Hyperparameter tuning script for temporal sequence models.
 Performs a full grid search over candidate hyperparameter combinations for
 both the LSTM and GRU models.  For each combination the script:
 
-    1. Rebuilds sequence arrays if ``sequence_length`` has changed.
-    2. Trains the model using :class:`~src.models.training.train_utils.Trainer`.
+    1. Rebuilds sequence arrays for both models at the candidate sequence_length.
+    2. Trains the model using the shared training loop from train_utils.
     3. Records the best validation loss achieved.
 
 Test-set inference is intentionally excluded from the tuning loop to keep
 the test set truly held-out.  A single final training run on the winning
 configuration (with test inference) should be performed manually afterwards
 by updating ``config.yaml`` and re-running the individual training scripts.
+
+Sequence length search values are expressed in 6-hourly time steps,
+consistent with the 6-hourly resampling applied to training data by
+preprocess.py.  The correspondence between search values and lookback
+windows is:
+
+    sequence_length=12  →  12 × 6 h =  3 days
+    sequence_length=24  →  24 × 6 h =  6 days
+    sequence_length=48  →  48 × 6 h = 12 days
 
 Results are saved to ``outputs/tuning/tuning_results.csv`` and printed as
 a ranked summary on completion.
@@ -50,8 +59,11 @@ logger = setup_logging()
 
 # Search space
 
+# Sequence lengths are expressed in 6-hourly time steps, matching the
+# resampled cadence of the training data.  Values correspond to lookback
+# windows of 3, 6, and 12 days respectively.
 SEARCH_SPACE: dict[str, list[Any]] = {
-    "sequence_length": [6, 12, 24],
+    "sequence_length": [12, 24, 48],
     "num_layers": [1, 2],
     "hidden_size": [64, 128],
     "learning_rate": [0.001, 0.0005],
@@ -73,7 +85,7 @@ class TuningResult:
 
     Attributes:
         model_name: ``"lstm"`` or ``"gru"``.
-        sequence_length: Sequence window length used.
+        sequence_length: Sequence window length used (in 6-hourly steps).
         num_layers: Number of stacked recurrent layers.
         hidden_size: Hidden state dimensionality.
         learning_rate: Adam optimiser learning rate.
@@ -101,14 +113,19 @@ def rebuild_sequences(
         config: dict[str, Any],
         data_dir: Path,
 ) -> None:
-    """Rebuild the ``.npy`` sequence arrays for a given window length.
+    """Rebuild per-model ``.npy`` sequence arrays for a given window length.
+
+    Generates separate arrays for LSTM and GRU at the candidate
+    sequence_length, saving them with model-specific filename suffixes
+    (``X_train_lstm.npy``, ``X_train_gru.npy``, etc.).  This ensures the
+    tuning loop exercises both models against identically windowed data.
 
     Modifies a copy of the config in memory so that ``DataPreprocessor``
     uses the candidate ``sequence_length`` without altering ``config.yaml``
     on disk.
 
     Args:
-        sequence_length: The window length to build sequences for.
+        sequence_length: The candidate window length to build sequences for.
         config: The full project configuration dictionary.
         data_dir: Directory containing the baseline CSV splits and to which
             the new ``.npy`` arrays will be written.
@@ -125,12 +142,16 @@ def rebuild_sequences(
     preprocessor.scaler_X = _load_scaler(data_dir / "scaler_X.pkl")
     preprocessor.scaler_y = _load_scaler(data_dir / "scaler_y.pkl")
 
-    # Rebuild sequences for each split from the frozen baseline CSVs.
+    # Rebuild sequences for each split from the frozen 6-hourly baseline CSVs.
     for split in ("train", "val", "test"):
         df = pd.read_csv(data_dir / f"{split}_baseline.csv")
         X_seq, y_seq = preprocessor._make_sequences(df, sequence_length)
-        np.save(data_dir / f"X_{split}.npy", X_seq)
-        np.save(data_dir / f"y_{split}.npy", y_seq)
+
+        # Save with per-model suffixes so train_lstm.py and train_gru.py
+        # each load the correct arrays after tuning completes.
+        for model_key in ("lstm", "gru"):
+            np.save(data_dir / f"X_{split}_{model_key}.npy", X_seq)
+            np.save(data_dir / f"y_{split}_{model_key}.npy", y_seq)
 
     logger.info("Sequences rebuilt successfully.")
 
@@ -171,7 +192,7 @@ def train_combination(
     """Train a single hyperparameter combination and return the result.
 
     Mirrors the training loop in :class:`~src.models.training.train_utils.Trainer`
-    but omits test inference and model checkpointing to keep tuning fast.
+    but omits test inference and final checkpointing to keep tuning fast.
     Only the best validation loss is recorded.
 
     Args:
@@ -187,8 +208,10 @@ def train_combination(
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    X_train, y_train = _load_split(data_dir, "train")
-    X_val, y_val = _load_split(data_dir, "val")
+    # Load model-specific prefixed arrays so both models always train on
+    # windows of the candidate sequence_length.
+    X_train, y_train = _load_split(data_dir, "train", prefix=model_name)
+    X_val, y_val = _load_split(data_dir, "val", prefix=model_name)
 
     train_loader = build_dataloader(X_train, y_train, batch_size=32)
     val_loader = build_dataloader(X_val, y_val, batch_size=256)
@@ -209,7 +232,7 @@ def train_combination(
     epochs_trained = 0
     max_epochs = base_config["models"][model_name]["epochs"]
 
-    # Tuning checkpoints go to a temporary directory so they don't
+    # Tuning checkpoints go to a temporary directory so they do not
     # overwrite the production model weights.
     checkpoint_dir = output_dir / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -278,9 +301,7 @@ def run_grid_search(
     total_runs = len(combinations) * len(MODELS)
     logger.info(
         "Starting grid search: %d combinations × %d models = %d total runs.",
-        len(combinations),
-        len(MODELS),
-        total_runs,
+        len(combinations), len(MODELS), total_runs,
     )
 
     results: list[TuningResult] = []
@@ -288,9 +309,7 @@ def run_grid_search(
     run_number = 0
 
     for combo in combinations:
-        # Rebuild sequences only when sequence_length changes — avoids
-        # redundant preprocessing between combinations that share the same
-        # window length.
+        # Rebuild sequences only when sequence_length changes.
         if combo["sequence_length"] != current_seq_len:
             rebuild_sequences(combo["sequence_length"], config, data_dir)
             current_seq_len = combo["sequence_length"]
@@ -300,8 +319,7 @@ def run_grid_search(
             logger.info(
                 "Run %d/%d — %s | seq_len=%d  layers=%d  "
                 "hidden=%d  lr=%s  patience=%d",
-                run_number,
-                total_runs,
+                run_number, total_runs,
                 model_name.upper(),
                 combo["sequence_length"],
                 combo["num_layers"],
@@ -372,9 +390,10 @@ def save_and_report(results: list[TuningResult], output_dir: Path) -> None:
         print(f"{'=' * 60}")
         print(subset.to_string(index=False))
 
-    # Print the single best config per model for easy copy-paste into config.yaml.
+    # Print the best config per model for copy-paste into config.yaml.
     print(f"\n{'=' * 60}")
     print("  RECOMMENDED CONFIG.YAML UPDATES")
+    print("  (sequence_length values are in 6-hourly steps)")
     print(f"{'=' * 60}")
 
     for model_name in MODELS:
@@ -394,21 +413,36 @@ def restore_original_sequences(
         config: dict[str, Any],
         data_dir: Path,
 ) -> None:
-    """Restore ``.npy`` sequence arrays to the length in ``config.yaml``.
+    """Restore per-model ``.npy`` arrays to the lengths in ``config.yaml``.
 
-    Called after the grid search completes so that the preprocessed arrays
-    on disk match what the rest of the pipeline expects.
+    Called after the grid search completes so that the on-disk arrays
+    match the sequence lengths configured for the final training runs.
 
     Args:
         config: Full project configuration dictionary (unmodified).
         data_dir: Directory containing baseline CSV splits and ``.npy`` files.
     """
-    original_seq_len = config["models"]["lstm"]["sequence_length"]
-    logger.info(
-        "Restoring original sequence arrays (sequence_length=%d) …",
-        original_seq_len,
-    )
-    rebuild_sequences(original_seq_len, config, data_dir)
+    lstm_seq = config["models"]["lstm"]["sequence_length"]
+    gru_seq = config["models"]["gru"]["sequence_length"]
+
+    # Restore each model's arrays independently so each reflects the
+    # sequence_length that will be used in the final training run.
+    for model_key, seq_len in (("lstm", lstm_seq), ("gru", gru_seq)):
+        logger.info(
+            "Restoring %s sequence arrays (sequence_length=%d) …",
+            model_key.upper(), seq_len,
+        )
+        preprocessor = DataPreprocessor.__new__(DataPreprocessor)
+        preprocessor.config = config
+        preprocessor.scaler_X = _load_scaler(data_dir / "scaler_X.pkl")
+        preprocessor.scaler_y = _load_scaler(data_dir / "scaler_y.pkl")
+
+        for split in ("train", "val", "test"):
+            df = pd.read_csv(data_dir / f"{split}_baseline.csv")
+            X_seq, y_seq = preprocessor._make_sequences(df, seq_len)
+            np.save(data_dir / f"X_{split}_{model_key}.npy", X_seq)
+            np.save(data_dir / f"y_{split}_{model_key}.npy", y_seq)
+
     logger.info("Original sequences restored.")
 
 
@@ -429,7 +463,7 @@ def main() -> None:
 
     save_and_report(results, output_dir)
 
-    # Restore the original .npy arrays so nothing downstream breaks.
+    # Restore the correct per-model arrays so nothing downstream breaks.
     restore_original_sequences(config, data_dir)
 
     logger.info("Tuning complete.")

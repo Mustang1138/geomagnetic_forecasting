@@ -21,6 +21,8 @@ logger = setup_logging()
 def train_lstm(
         data_dir: str = "data/processed",
         output_dir: str = "outputs/temporal",
+        num_epochs: int | None = None,
+        batch_size: int | None = None,
 ) -> None:
     """Train the LSTM regressor using configuration from ``config.yaml``.
 
@@ -29,6 +31,8 @@ def train_lstm(
             ``scaler_y.pkl``.
         output_dir: Directory to which the model checkpoint and prediction
             CSV are written.
+        num_epochs: Override the epoch count from config (used in testing).
+        batch_size: Override the batch size from config (used in testing).
     """
     config = load_config()
     lstm_cfg = config["models"]["lstm"]
@@ -39,10 +43,14 @@ def train_lstm(
         num_layers=lstm_cfg["num_layers"],
         dropout=lstm_cfg["dropout"],
         learning_rate=lstm_cfg["learning_rate"],
-        batch_size=lstm_cfg["batch_size"],
-        epochs=lstm_cfg["epochs"],
+        batch_size=batch_size if batch_size is not None else lstm_cfg["batch_size"],
+        epochs=num_epochs if num_epochs is not None else lstm_cfg["epochs"],
+        patience=lstm_cfg["patience"],
         data_dir=Path(data_dir),
         output_dir=Path(output_dir),
+        # Load LSTM-specific sequence arrays (X_train_lstm.npy etc.) generated
+        # by preprocess.py using the LSTM sequence_length from config.yaml.
+        data_prefix="lstm",
     )
 
     trainer = Trainer(model_class=LSTMRegressor, cfg=cfg)

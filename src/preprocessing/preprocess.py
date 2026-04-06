@@ -2,13 +2,14 @@
 Data preprocessing pipeline for geomagnetic forecasting.
 
 Implements a unified preprocessing strategy for both baseline regression
-models and temporal (LSTM) models, ensuring strict comparability.
+models and temporal (LSTM/GRU) models, ensuring strict comparability.
 
 Design principles:
 - Chronological splitting only (no leakage)
 - Identical cleaning for all models
 - Scaling fitted on training data only
-- Baseline and LSTM data derived from the same source
+- 6-hourly resampling to match real-time inference cadence
+- Per-model sequence arrays to honour each model's sequence_length
 
 Rationale:
 Time-series forecasting models are highly sensitive to data leakage
@@ -19,9 +20,10 @@ fair model comparison and reproducibility
 References:
 - Box et al. (2015) - Time series analysis and forecasting methods
 - Cerqueira et al. (2020) - Time series model evaluation best practices
-- Hochreiter and Schmidhuber (1997) - LSTM architecture and training
-- Pedregosa et al. (2011) - scikit-learn preprocessing utilities
 - Cristoforetti et al. (2022) - Preprocessing importance in geomagnetic forecasting
+- Hochreiter and Schmidhuber (1997) - LSTM architecture and training
+- Papitashvili and King (2020) - OMNI2 data documentation
+- Pedregosa et al. (2011) - scikit-learn preprocessing utilities
 """
 
 import pickle
@@ -52,7 +54,7 @@ class DataPreprocessor:
     This class implements a single, consistent preprocessing pipeline that
     produces data for both:
     1. Baseline models (tabular CSV format)
-    2. LSTM models (sequence arrays in NumPy format)
+    2. Temporal models — LSTM and GRU (model-specific NumPy sequence arrays)
 
     Using a single preprocessing class ensures:
     - Identical data cleaning across all models
@@ -60,9 +62,11 @@ class DataPreprocessor:
     - Consistent train/validation/test splits
     - No subtle experimental biases from pipeline divergence
 
-    This approach is critical for fair model comparison and follows best
-    practices for time series forecasting experiments (Cristoforetti et al., 2022;
-    Cerqueira et al., 2020).
+    The pipeline resamples raw hourly OMNI2 data to 6-hourly averages,
+    matching the cadence of the real-time DSCOVR inference pipeline
+    (realtime_pipeline.py). This eliminates the train/inference distribution
+    shift that would otherwise occur if models were calibrated on hourly
+    patterns but received 6-hourly inputs at deployment.
 
     Attributes
     ----------
@@ -81,7 +85,7 @@ class DataPreprocessor:
     # Input features used by ML models.
     # Bt is included as an explicit coupling/energy term alongside Bz.
     # dst is included as a direct input feature because it is the dominant
-    # component of SSI (weight 0.35) and provides the models with explicit
+    # component of SSI (weight 0.30) and provides the models with explicit
     # access to the primary geomagnetic response signal. At prediction time,
     # the current Dst reading is genuinely available before the next
     # timestep's SSI is observed, so this does not constitute data leakage.
@@ -113,17 +117,13 @@ class DataPreprocessor:
         # Load configuration from YAML file
         self.config = load_config(config_path)
 
-        # Separate scalers for inputs and target prevent target leakage
-        # and allow inverse-transforming predictions later (Pedregosa et al.,
-        # 2011).
-
-        # Scaler for input features (X)
-        # Will be fitted on training data only to prevent information leakage
+        # Scaler for input features (X).
+        # Will be fitted on training data only to prevent information leakage.
         self.scaler_X = StandardScaler()
 
-        # Scaler for target variable (y)
+        # Scaler for target variable (y).
         # Kept separate to enable inverse transformation of model predictions
-        # back to original scale for interpretable error metrics
+        # back to original scale for interpretable error metrics.
         self.scaler_y = StandardScaler()
 
     # Core cleaning
@@ -149,32 +149,61 @@ class DataPreprocessor:
 
         Notes
         -----
-        The filling strategy:
-        1. Sort by datetime to ensure temporal ordering
-        2. Forward-fill (propagate last valid observation forward)
-        3. Backward-fill (propagate next valid observation backward)
-        4. Drop any remaining NaNs (e.g., if entire series is missing)
-
-        This approach handles gaps at both ends of the series deterministically
-        whilst preserving the temporal structure of the data.
+        Filling is applied BEFORE 6-hourly resampling so that the
+        aggregation operates on a complete hourly series and does not
+        propagate NaNs into 6-hour bins.
         """
         # Ensure chronological ordering before filling
-        # This is critical for meaningful forward/backward propagation
         df = df.sort_values("datetime").reset_index(drop=True)
 
-        # Fill all feature columns — dst is now included in FEATURE_COLS
-        # so no additional columns are needed here.
         cols = self.FEATURE_COLS
 
-        # Forward-fill followed by backward-fill ensures gaps at both
-        # ends of the series are handled deterministically.
-        # ffill(): propagate last valid value forward
-        # bfill(): propagate next valid value backward
+        # Forward-fill followed by backward-fill handles gaps at both ends.
         df[cols] = df[cols].ffill().bfill()
 
-        # Drop any remaining samples with NaN values
-        # These would only remain if an entire column is missing
+        # Drop any remaining NaN rows (only if an entire column is missing)
         return df.dropna(subset=cols)
+
+    def _resample_6hourly(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Resample hourly OMNI2 data to 6-hourly averages.
+
+        The real-time forecasting pipeline (realtime_pipeline.py) resamples
+        DSCOVR observations to 6-hourly averages before model inference.
+        Training data must share the same temporal cadence to avoid a
+        train/inference distribution shift, which would cause models
+        calibrated on hourly patterns to receive 6-hourly inputs at
+        deployment — degrading forecast reliability
+        (Cristoforetti et al., 2022).
+
+        Averaging over 6-hour windows also reduces high-frequency noise
+        that is not geophysically meaningful for storm-scale forecasting
+        (Papitashvili and King, 2020).
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Hourly DataFrame with a 'datetime' column and feature columns.
+
+        Returns
+        -------
+        pd.DataFrame
+            6-hourly resampled DataFrame, reset to a clean integer index.
+
+        Notes
+        -----
+        Must be called AFTER missing-value filling and BEFORE outlier
+        removal, so the aggregation operates on a complete hourly series.
+        """
+        df = (
+            df.set_index("datetime")
+            .resample("6h")
+            .mean(numeric_only=True)
+            .dropna(how="all")
+            .reset_index()
+        )
+        logger.info("Resampled to 6-hourly cadence: %d rows.", len(df))
+        return df
 
     def _remove_physical_outliers(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -185,6 +214,10 @@ class DataPreprocessor:
         improves model robustness and prevents training instability
         (Liemohn et al., 2021).
 
+        Thresholds are defined in config.yaml under physical_limits,
+        supporting reproducibility and sensitivity analysis without
+        modifying code (Martin, 2008).
+
         Parameters
         ----------
         df : pd.DataFrame
@@ -194,30 +227,11 @@ class DataPreprocessor:
         -------
         pd.DataFrame
             DataFrame with physically implausible samples removed.
-
-        Notes
-        -----
-        Outlier thresholds are defined in config.yaml to allow experiment-level
-        control without modifying code. This design supports reproducibility
-        and facilitates sensitivity analysis on outlier handling strategies.
-
-        Thresholds are based on:
-        - OMNI data documentation (Papitashvili and King, 2020)
-        - Physical constraints on solar wind parameters
-        - Historical extreme event observations
-
-        Samples are removed (not clipped) to avoid introducing artificial
-        values at the boundaries.
         """
-        # Load physical limits from configuration
         limits = self.config["physical_limits"]
 
-        # Apply limits to each configured parameter
         for col, (low, high) in limits.items():
             if col in df.columns:
-                # Remove samples outside [low, high] range
-                # This is a row-wise filter, so samples violating any limit are
-                # removed
                 df = df[(df[col] >= low) & (df[col] <= high)]
 
         return df
@@ -235,6 +249,9 @@ class DataPreprocessor:
         to "peek into the future", invalidating forecasting performance
         estimates (Box et al., 2015; Cerqueira et al., 2020).
 
+        Split proportions are read from config.yaml (training.test_split
+        and training.validation_split). The remainder forms the training set.
+
         Parameters
         ----------
         df : pd.DataFrame
@@ -242,39 +259,18 @@ class DataPreprocessor:
 
         Returns
         -------
-        train : pd.DataFrame
-            Training set (earliest data).
-        val : pd.DataFrame
-            Validation set (middle period).
-        test : pd.DataFrame
-            Test set (most recent data, representing future predictions).
-
-        Notes
-        -----
-        Split proportions are defined in config.yaml. Typical values:
-        - Train: 70% (earliest data for model fitting)
-        - Validation: 15% (middle data for hyperparameter tuning/early stopping)
-        - Test: 15% (most recent data for final evaluation)
-
-        The validation set is used by LSTM models for early stopping but is
-        intentionally not used by baseline models, which employ fixed
-        hyperparameters.
-
-        Random splitting is explicitly avoided to prevent temporal leakage,
-        which would invalidate forecasting performance estimates (Box et al., 2015).
+        train, val, test : pd.DataFrame
+            Chronological splits with earliest data in train and most
+            recent data in test.
         """
-        # Extract split fractions from configuration
         test_frac = self.config["training"]["test_split"]
         val_frac = self.config["training"]["validation_split"]
 
-        # Calculate split indices
         n = len(df)
-        n_test = int(n * test_frac)  # Most recent data
-        n_val = int(n * val_frac)  # Middle period
-        n_train = n - n_test - n_val  # Earliest data
+        n_test = int(n * test_frac)
+        n_val = int(n * val_frac)
+        n_train = n - n_test - n_val
 
-        # Perform chronological split
-        # Earlier indices = earlier in time
         train = df.iloc[:n_train].copy()
         val = df.iloc[n_train:n_train + n_val].copy()
         test = df.iloc[n_train + n_val:].copy()
@@ -290,143 +286,66 @@ class DataPreprocessor:
         """
         Fit scalers on training data only and apply to all splits.
 
-        StandardScaler centres features to zero mean and unit variance,
-        which is particularly important for:
-        1. Gradient-based optimisation (LSTMs)
-        2. Preventing features with larger scales from dominating
-        3. Improving numerical stability
+        StandardScaler centres features to zero mean and unit variance.
+        Scalers are fitted ONLY on the training split to prevent information
+        leakage from validation/test sets (Pedregosa et al., 2011;
+        Cerqueira et al., 2020).
 
-        Critically, scalers are fitted ONLY on training data to prevent
-        information leakage from validation/test sets into the training
-        process (Pedregosa et al., 2011; Cerqueira et al., 2020).
+        Separate scalers for X and y allow inverse transformation of
+        predictions back to physical SSI units during evaluation.
 
         Parameters
         ----------
-        train : pd.DataFrame
-            Training set (used to fit scalers).
-        val : pd.DataFrame
-            Validation set (scalers applied only).
-        test : pd.DataFrame
-            Test set (scalers applied only).
+        train, val, test : pd.DataFrame
+            Chronological splits.
 
         Returns
         -------
-        train : pd.DataFrame
-            Scaled training set.
-        val : pd.DataFrame
-            Scaled validation set (using training statistics).
-        test : pd.DataFrame
-            Scaled test set (using training statistics).
-
-        Notes
-        -----
-        Standardisation formula:
-            z = (x - μ) / σ
-        where μ and σ are computed from the training set only.
-
-        This prevents information leakage: validation and test sets are
-        transformed using training statistics, simulating a realistic
-        deployment scenario where future data statistics are unknown.
-
-        Separate scalers for X and y allow inverse transformation of
-        predictions back to original scale during evaluation.
+        train, val, test : pd.DataFrame
+            Standardised splits (validation and test use training statistics).
         """
-        # Fit input feature scaler on training data only
-        # This computes mean and standard deviation from training set
+        # Fit on training data only
         self.scaler_X.fit(train[self.FEATURE_COLS])
-
-        # Fit target scaler on training data only
-        # Kept separate to enable inverse transformation of predictions
         self.scaler_y.fit(train[[self.TARGET_COL]])
 
-        # Apply fitted scalers to all splits
-        # Transform (but do not refit) validation and test sets
+        # Transform all splits using training statistics
         for df in (train, val, test):
-            # Transform features using training statistics
-            df[self.FEATURE_COLS] = self.scaler_X.transform(
-                df[self.FEATURE_COLS])
-
-            # Transform target using training statistics
-            df[self.TARGET_COL] = self.scaler_y.transform(
-                df[[self.TARGET_COL]])
+            df[self.FEATURE_COLS] = self.scaler_X.transform(df[self.FEATURE_COLS])
+            df[self.TARGET_COL] = self.scaler_y.transform(df[[self.TARGET_COL]])
 
         return train, val, test
 
-    # LSTM sequence generation
-
-    # Note:
-    # Sequence construction necessarily reduces the number of usable samples
-    # by `sequence_length`. This affects only temporal models; baseline models
-    # operate on the full tabular dataset. This behaviour is expected and
-    # documented to ensure transparency in model comparison.
+    # Sequence generation
 
     def _make_sequences(
             self, df: pd.DataFrame, seq_len: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Convert tabular data into sliding window sequences for LSTM models.
+        Convert tabular data into sliding window sequences for LSTM/GRU.
 
-        LSTMs require sequential input data. This method creates overlapping
-        windows of length `seq_len`, where each window is used to predict
-        the subsequent target value (sequence-to-one forecasting).
+        Creates overlapping windows of length seq_len, each predicting the
+        immediately following target value (sequence-to-one forecasting).
 
         Parameters
         ----------
         df : pd.DataFrame
             Preprocessed and scaled DataFrame.
         seq_len : int
-            Length of input sequences (number of time steps).
+            Length of input sequences (number of 6-hourly time steps).
 
         Returns
         -------
-        X : np.ndarray
-            Input sequences of shape (n_samples, seq_len, n_features).
-        y : np.ndarray
-            Target values of shape (n_samples, 1).
-            Each target corresponds to the time step immediately following
-            its input sequence.
-
-        Notes
-        -----
-        Sequence construction:
-        - Sample i uses features from time steps [i : i+seq_len]
-        - Sample i predicts target at time step [i+seq_len]
-
-        This formulation aligns with standard sequence-to-one forecasting
-        setups used in LSTM time series prediction (Hochreiter and
-        Schmidhuber, 1997; Abduallah et al., 2022).
-
-        Example:
-        If seq_len=10 and we have 1000 samples:
-        - First sequence: samples 0-9 → predict sample 10
-        - Second sequence: samples 1-10 → predict sample 11
-        - ...
-        - Last sequence: samples 989-998 → predict sample 999
-        - Total sequences: 990 (reduced by seq_len from original)
-
-        The reduction in sample count is expected and affects only temporal
-        models. Baseline models use the full tabular dataset without
-        sequence construction.
+        X : np.ndarray, shape (n_samples, seq_len, n_features)
+        y : np.ndarray, shape (n_samples, 1)
         """
-        X, y = [], []
-
-        # Extract feature matrix and target vector
         features = df[self.FEATURE_COLS].values
         target = df[self.TARGET_COL].values
 
-        # Create sliding windows
-        # Stop at len(df) - seq_len to ensure we have a target for each
-        # sequence
+        X, y = [], []
         for i in range(len(df) - seq_len):
-            # Input sequence: features from time i to i+seq_len (exclusive)
             X.append(features[i:i + seq_len])
-
-            # Target: value at time i+seq_len (one step ahead)
             y.append(target[i + seq_len])
 
-        # Convert lists to NumPy arrays
-        # X shape: (n_samples, seq_len, n_features)
-        # y shape: (n_samples, 1)
         return np.array(X), np.array(y).reshape(-1, 1)
 
     # Public pipeline
@@ -435,180 +354,156 @@ class DataPreprocessor:
             self,
             input_csv: str = "data/raw/omni2_combined.csv",
             output_dir: str = "data/processed",
-    ) -> Dict[str, int]:
+    ) -> Dict[str, object]:
         """
         Execute the full preprocessing pipeline and persist outputs.
 
-        This method orchestrates the complete preprocessing workflow:
-        1. Load raw OMNI data
-        2. Validate schema and data quality
-        3. Handle missing values
-        4. Remove physical outliers
-        5. Compute derived features (SSI, severity classes, etc.)
-        6. Split data chronologically
-        7. Fit scalers and standardise
-        8. Generate LSTM sequences
-        9. Persist all outputs (CSV for baselines, NumPy for LSTM, scalers)
+        Pipeline stages:
+        1.  Load raw OMNI2 CSV
+        2.  Validate schema
+        3.  Fill missing values (ffill/bfill)
+        4.  Resample to 6-hourly averages (if config.data.resample_6h is true)
+        5.  Remove physical outliers
+        6.  Compute derived features (SSI, storm class, auroral latitude)
+            in physical space — BEFORE scaling
+        7.  Chronological split (train / val / test)
+        8.  Fit StandardScalers on training data; transform all splits
+        9.  Persist baseline CSVs for RF and LR
+        10. Generate and persist per-model sequence arrays for LSTM and GRU
+        11. Persist fitted scalers
 
         Parameters
         ----------
-        input_csv : str, optional
-            Path to raw OMNI CSV file.
-            Default is "data/raw/omni2_combined.csv".
-        output_dir : str, optional
-            Directory for saving processed outputs.
-            Default is "data/processed".
+        input_csv : str
+            Path to the combined raw OMNI2 CSV.
+        output_dir : str
+            Directory for all processed outputs.
 
         Returns
         -------
         dict
-            Summary statistics about the processed dataset:
-            - train_samples: Number of LSTM training sequences
-            - val_samples: Number of LSTM validation sequences
-            - test_samples: Number of LSTM test sequences
-            - sequence_length: Length of LSTM input sequences
-            - n_features: Number of input features
-            - target: Name of target variable
+            Summary statistics describing the processed dataset.
 
-        Outputs
-        -------
-        The following files are created in output_dir:
+        Output files
+        ------------
+        Baseline CSVs (for RF / LR):
+            train_baseline.csv, val_baseline.csv, test_baseline.csv
 
-        Baseline model data (CSV format):
-        - train_baseline.csv: Training set (scaled)
-        - val_baseline.csv: Validation set (scaled)
-        - test_baseline.csv: Test set (scaled)
+        Per-model sequence arrays (for LSTM and GRU respectively):
+            X_train_lstm.npy, y_train_lstm.npy
+            X_val_lstm.npy,   y_val_lstm.npy
+            X_test_lstm.npy,  y_test_lstm.npy
+            X_train_gru.npy,  y_train_gru.npy
+            X_val_gru.npy,    y_val_gru.npy
+            X_test_gru.npy,   y_test_gru.npy
 
-        LSTM model data (NumPy format):
-        - X_train.npy: Training sequences (n_samples, seq_len, n_features)
-        - y_train.npy: Training targets (n_samples, 1)
-        - X_val.npy: Validation sequences
-        - y_val.npy: Validation targets
-        - X_test.npy: Test sequences
-        - y_test.npy: Test targets
-
-        Scalers (for inverse transformation):
-        - scaler_X.pkl: Fitted StandardScaler for features
-        - scaler_y.pkl: Fitted StandardScaler for target
-
-        Notes
-        -----
-        The pipeline enforces strict chronological ordering and prevents
-        any form of data leakage. All transformations (filling, outlier
-        removal, scaling) use only information available at each time step.
-
-        Derived features are computed BEFORE scaling to maintain physical
-        interpretability (Liemohn et al., 2021).
+        Scalers:
+            scaler_X.pkl, scaler_y.pkl
         """
         logger.info("Starting preprocessing pipeline")
 
-        # Create output directory if it doesn't exist
         ensure_dir(output_dir)
         out = Path(output_dir)
 
-        # Load raw OMNI data
-        # parse_dates ensures datetime column is correctly typed
+        # Load
         df = pd.read_csv(input_csv, parse_dates=["datetime"])
-
-        # Early validation ensures schema correctness before mutation
-        # This catches issues like missing columns or wrong data types early
         validate_omni_dataframe(df)
 
-        # Data cleaning
-        df = self._handle_missing(df)  # Fill missing values
-        df = self._remove_physical_outliers(df)  # Remove unphysical samples
+        # Clean
+        df = self._handle_missing(df)
 
-        # 🔒 DERIVED FEATURES COMPUTED IN PHYSICAL SPACE
-        # This is critical: we compute derived features (SSI, severity classes,
-        # auroral latitude) BEFORE scaling to maintain physical interpretability.
-        # Scaling is applied afterwards to the complete feature set.
+        # Resample to 6-hourly cadence when configured (default: True).
+        # Must occur AFTER filling and BEFORE outlier removal.
+        if self.config.get("data", {}).get("resample_6h", True):
+            df = self._resample_6hourly(df)
+
+        df = self._remove_physical_outliers(df)
+
+        # Derived features (computed in physical space before scaling)
         df = add_all_derived_features(df)
 
-        # Sanity check: no missing values after imputation
-        assert not df[self.FEATURE_COLS + [self.TARGET_COL]
-                      ].isnull().any().any(), ("Missing values remain after imputation")
+        # Sanity check — no missing values should remain after imputation
+        assert not df[self.FEATURE_COLS + [self.TARGET_COL]].isnull().any().any(), (
+            "Missing values remain after imputation — check pipeline."
+        )
 
-        # Chronological splitting (prevents temporal leakage)
+        # Split
         train, val, test = self._split(df)
+        logger.info(
+            "Split sizes — train: %d  val: %d  test: %d",
+            len(train), len(val), len(test),
+        )
 
-        # Standardisation (fitted on training data only)
+        # Scale (train-only fit)
         train, val, test = self._scale(train, val, test)
 
-        # Persist baseline (tabular) datasets
-        # These are used by Linear Regression and Random Forest models
+        # Persist baseline CSVs
         train.to_csv(out / "train_baseline.csv", index=False)
         val.to_csv(out / "val_baseline.csv", index=False)
         test.to_csv(out / "test_baseline.csv", index=False)
+        logger.info("Baseline CSVs saved.")
 
-        # Generate and persist LSTM-ready sequences
-        # Extract sequence length from configuration
-        seq_len = self.config["models"]["lstm"]["sequence_length"]
+        # Persist per-model sequence arrays
+        # Each temporal model reads its own sequence_length from config.yaml.
+        # Saving separate arrays corrects the previous behaviour where both
+        # models consumed the LSTM sequence_length, inadvertently giving the
+        # GRU a shorter temporal context than intended.
+        for model_key in ("lstm", "gru"):
+            seq_len = self.config["models"][model_key]["sequence_length"]
 
-        # Create sequences for each split
-        # Note: This reduces the number of samples by seq_len in each split
-        X_train, y_train = self._make_sequences(train, seq_len)
-        X_val, y_val = self._make_sequences(val, seq_len)
-        X_test, y_test = self._make_sequences(test, seq_len)
+            X_tr, y_tr = self._make_sequences(train, seq_len)
+            X_vl, y_vl = self._make_sequences(val, seq_len)
+            X_te, y_te = self._make_sequences(test, seq_len)
 
-        # Persist NumPy arrays for LSTM training
-        # Binary format is more efficient than CSV for large arrays
-        np.save(out / "X_train.npy", X_train)
-        np.save(out / "y_train.npy", y_train)
-        np.save(out / "X_val.npy", X_val)
-        np.save(out / "y_val.npy", y_val)
-        np.save(out / "X_test.npy", X_test)
-        np.save(out / "y_test.npy", y_test)
+            np.save(out / f"X_train_{model_key}.npy", X_tr)
+            np.save(out / f"y_train_{model_key}.npy", y_tr)
+            np.save(out / f"X_val_{model_key}.npy", X_vl)
+            np.save(out / f"y_val_{model_key}.npy", y_vl)
+            np.save(out / f"X_test_{model_key}.npy", X_te)
+            np.save(out / f"y_test_{model_key}.npy", y_te)
 
-        # Persist scalers to enable inverse transformation of predictions
-        # during evaluation and deployment.
-        # Inverse transformation is essential for:
-        # 1. Computing metrics in original units (interpretable RMSE)
-        # 2. Comparing predictions with observed values
-        # 3. Deployment to operational forecasting systems
-        with open(out / "scaler_X.pkl", "wb") as f:
-            pickle.dump(self.scaler_X, f)
+            logger.info(
+                "%s sequences: train=%d  val=%d  test=%d  (seq_len=%d)",
+                model_key.upper(), len(X_tr), len(X_vl), len(X_te), seq_len,
+            )
 
-        with open(out / "scaler_y.pkl", "wb") as f:
-            pickle.dump(self.scaler_y, f)
+        # Persist scalers
+        with open(out / "scaler_X.pkl", "wb") as fh:
+            pickle.dump(self.scaler_X, fh)
+        with open(out / "scaler_y.pkl", "wb") as fh:
+            pickle.dump(self.scaler_y, fh)
+        logger.info("Scalers saved.")
 
-        # Compile summary statistics
+        # Summary
+        lstm_seq = self.config["models"]["lstm"]["sequence_length"]
+        gru_seq = self.config["models"]["gru"]["sequence_length"]
+
         summary = {
-            "train_samples": len(X_train),
-            "val_samples": len(X_val),
-            "test_samples": len(X_test),
-            "sequence_length": seq_len,
+            "train_rows": len(train),
+            "val_rows": len(val),
+            "test_rows": len(test),
+            "lstm_sequence_length": lstm_seq,
+            "gru_sequence_length": gru_seq,
             "n_features": len(self.FEATURE_COLS),
             "target": self.TARGET_COL,
+            "target_name": self.TARGET_COL,
+            "feature_names": self.FEATURE_COLS.copy(),
         }
 
-        logger.info(f"Preprocessing complete: {summary}")
+        logger.info("Preprocessing complete: %s", summary)
         return summary
 
 
 def main():
     """
-    Entry point for preprocessing script.
-
-    This function runs the complete preprocessing pipeline with default
-    parameters, suitable for standard workflow execution.
+    Entry point for the preprocessing pipeline.
 
     Usage
     -----
-    Run from command line:
-        python preprocess.py
+    python -m src.preprocessing.preprocess
 
-    The script will:
-    1. Load raw OMNI data from data/raw/omni2_combined.csv
-    2. Clean and validate the data
-    3. Compute derived features
-    4. Split chronologically into train/val/test
-    5. Standardise features and target
-    6. Generate LSTM sequences
-    7. Save all outputs to data/processed/
-
-    Output files are consumed by downstream training scripts:
-    - baseline_models.py (uses CSV files)
-    - lstm_trainer.py (uses NumPy arrays)
+    Reads config.yaml, processes data/raw/omni2_combined.csv, and writes
+    all outputs to data/processed/.
     """
     DataPreprocessor().run()
 
