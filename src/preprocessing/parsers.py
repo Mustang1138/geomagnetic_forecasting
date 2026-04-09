@@ -1,38 +1,36 @@
-"""
-Parsing utilities for geomagnetic forecasting project.
-CORRECTED VERSION with accurate column positions from OMNI2 format specification.
-"""
+"""Parsing utilities for OMNI2 and DSCOVR data files."""
 
+import logging
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 
+logger = logging.getLogger(__name__)
+
 
 def parse_omni2_file(filepath: Path) -> Optional[pd.DataFrame]:
+    """Parse a fixed-width OMNI2 annual data file downloaded from NASA SPDF.
+
+    Parameters
+    ----------
+    filepath : Path
+        Path to the ``.dat`` file.
+
+    Returns
+    -------
+    pd.DataFrame or None
+        Parsed DataFrame sorted by datetime, or ``None`` if parsing fails.
     """
-    Parse a fixed-width OMNI2 data file.
-
-    Column specifications follow the official NASA SPDF OMNI2 format
-    description to ensure scientific correctness
-    (NASA SPDF, 2024).
-    """
-
-    # The selected OMNI2 parameters represent well-established drivers and
-    # responses in geomagnetic storm dynamics:
-    # - Bz (GSM): primary coupling parameter for solar wind–magnetosphere interaction
-    # - Solar wind speed and density: control energy input magnitude
-    # - Dst index: standard measure of geomagnetic storm intensity
-    # (Abdullah et al., 2022; Zou et al., 2024).
-
     colspecs = [
-        (0, 4),  # Year
-        (4, 8),  # DOY
-        (8, 11),  # Hour
-        (36, 42),  # bt: Magnitude of average field vector |<B>| (word 10, F6.1)
+        (0, 4),    # Year
+        (4, 8),    # DOY
+        (8, 11),   # Hour
+        (36, 42),  # bt: Magnitude of average field vector |<B>| (F6.1)
         (78, 84),  # Bz GSM
         (123, 129),  # Proton density
         (129, 135),  # Bulk speed
+        (218, 221),  # Kp index (I3) — stored as Kp*10, e.g. 3+ = 33
         (225, 231),  # Dst
     ]
 
@@ -44,20 +42,18 @@ def parse_omni2_file(filepath: Path) -> Optional[pd.DataFrame]:
         "bz_gsm",
         "density",
         "speed",
+        "kp_raw",
         "dst",
     ]
 
-    # OMNI2 uses multiple sentinel values across different fixed-width formats
-    # (e.g. F6.0, I6), depending on variable and year.
-    # Explicit enumeration avoids misclassification of invalid measurements
-    # as physical extremes, a known source of ML degradation
-    # (NASA SPDF, 2024; Cristoforetti et al., 2022).
-
+    # OMNI2 uses multiple sentinel values across different fixed-width formats.
+    # Explicit enumeration avoids misclassifying invalid measurements as
+    # physical extremes.
     na_values = [
         "9999", " 9999", "999.9", " 999.9", "9999.", " 9999.",
         " 999.9", "999.99", "999999", " 999999", " 99999", "99999",
         "   99", "  9.9", "-999.9", " 999.99", "9999999", "999999.99",
-        "99999", " 99999", "9999. ", " 9999. ",  # Added for F6.0/I6 variations
+        "99999", " 99999", "9999. ", " 9999. ",
         "999.9 ", " 999.9 ", "9.999", " 9.999"
     ]
 
@@ -87,27 +83,31 @@ def parse_omni2_file(filepath: Path) -> Optional[pd.DataFrame]:
 
         df = df.dropna(subset=["datetime"])
 
-        out = df[["datetime", "bt", "bz_gsm", "speed", "density", "dst"]].copy()
+        # Kp is stored as Kp*10 in the fixed-width format; divide to recover
+        # the real value. Raw values ≥ 90 indicate missing data (fill value 99).
+        df["kp"] = df["kp_raw"] / 10.0
+        df.loc[df["kp"] > 9.0, "kp"] = float("nan")
+
+        out = df[["datetime", "bt", "bz_gsm", "speed", "density", "dst", "kp"]].copy()
         out = out.sort_values("datetime").reset_index(drop=True)
 
-        print(
-            f"Parsed {
-            filepath.name}: {
-            len(out)} rows, range {
-            out['datetime'].min()} → {
-            out['datetime'].max()}")
+        logger.info(
+            "Parsed %s: %d rows, range %s → %s",
+            filepath.name,
+            len(out),
+            out["datetime"].min(),
+            out["datetime"].max(),
+        )
 
         return out
 
     except Exception as err:
-        print(f"Failed parsing {filepath.name}: {err}")
+        logger.warning("Failed to parse %s: %s", filepath.name, err)
         return None
 
 
 def parse_dscovr_json(data: list) -> Optional[pd.DataFrame]:
-    """
-    Parse DSCOVR JSON format returned by NOAA SWPC.
-    """
+    """Parse a DSCOVR JSON feed returned by NOAA SWPC."""
     if len(data) < 2:
         return None
 
