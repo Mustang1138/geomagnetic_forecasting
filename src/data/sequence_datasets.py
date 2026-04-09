@@ -1,18 +1,4 @@
-"""
-Sequence dataset construction utilities.
-
-This module provides deterministic, leak-free construction of
-windowed sequence datasets for temporal models (e.g. persistence,
-linear-on-window, LSTM, GRU).
-
-Design principles:
-- Strict temporal causality (targets are always in the future)
-- No data leakage across time or splits
-- Stateless, testable core logic
-- Compatible with frozen preprocessing outputs
-"""
-
-from __future__ import annotations
+"""Deterministic, leak-free windowed sequence dataset construction for temporal models."""
 
 from pathlib import Path
 
@@ -25,12 +11,7 @@ def build_sequence_dataset(
         y: pd.Series,
         window: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Build a windowed sequence dataset.
-
-    For each time step t, the input sequence consists of the previous
-    `window` observations up to and including t, and the target is
-    the value at t+1.
+    """Build a windowed sequence dataset from aligned feature and target arrays.
 
     Parameters
     ----------
@@ -44,16 +25,11 @@ def build_sequence_dataset(
     Returns
     -------
     X_seq : np.ndarray
-        Array of shape (N - window, window, F)
+        Shape (N - window, window, F).
     y_seq : np.ndarray
-        Array of shape (N - window)
+        Shape (N - window,).
     timestamps : np.ndarray
-        Target timestamps corresponding to y_seq (t+1)
-
-    Raises
-    ------
-    ValueError
-        If inputs are misaligned or insufficient length.
+        Target timestamps corresponding to y_seq (t+1).
     """
     if not isinstance(X, pd.DataFrame):
         raise TypeError("X must be a pandas DataFrame")
@@ -80,7 +56,6 @@ def build_sequence_dataset(
     y_seq = []
     ts_seq = []
 
-    # Last usable t is len(X) - 2 (because target is t+1)
     for t in range(window - 1, len(X) - 1):
         X_seq.append(X_values[t - window + 1: t + 1])
         y_seq.append(y_values[t + 1])
@@ -99,20 +74,7 @@ def save_sequence_dataset(
         y_seq: np.ndarray,
         timestamps: np.ndarray,
 ):
-    """
-    Save a sequence dataset to disk as a compressed NumPy archive.
-
-    Parameters
-    ----------
-    output_path : Path
-        Path to the .npz file.
-    X_seq : np.ndarray
-        Input sequences.
-    y_seq : np.ndarray
-        Targets.
-    timestamps : np.ndarray
-        Target timestamps.
-    """
+    """Save a sequence dataset to disk as a compressed NumPy archive."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     np.savez_compressed(
@@ -126,18 +88,7 @@ def save_sequence_dataset(
 def load_sequence_dataset(
         input_path: Path,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Load a sequence dataset from a compressed NumPy archive.
-
-    Parameters
-    ----------
-    input_path : Path
-        Path to the .npz file.
-
-    Returns
-    -------
-    X_seq, y_seq, timestamps
-    """
+    """Load a sequence dataset from a compressed NumPy archive."""
     data = np.load(input_path)
     return data["X"], data["y"], data["timestamps"]
 
@@ -147,23 +98,7 @@ def build_and_save_all_splits(
         output_dir: Path,
         window: int,
 ):
-    """
-    Build and save sequence datasets for all data splits.
-
-    Expects the following files under processed_dir:
-    - X_train.csv, y_train.csv
-    - X_val.csv, y_val.csv
-    - X_test.csv, y_test.csv
-
-    Parameters
-    ----------
-    processed_dir : Path
-        Directory containing frozen preprocessing outputs.
-    output_dir : Path
-        Directory to save sequence datasets.
-    window : int
-        Sequence window length.
-    """
+    """Build and save sequence datasets for train, val, and test splits."""
     for split in ["train", "val", "test"]:
         X = pd.read_csv(
             processed_dir / f"X_{split}.csv",

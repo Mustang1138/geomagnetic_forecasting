@@ -1,4 +1,4 @@
-"""GET /api/models – returns available models with their evaluation metrics."""
+"""GET /api/models — returns available models with their evaluation metrics."""
 
 from fastapi import APIRouter
 
@@ -9,9 +9,5 @@ router = APIRouter()
 
 @router.get("/models")
 def list_models():
-    """
-    Return all models with test-set metrics.
-
-        [{ "key": "rf", "label": "Random Forest", "rmse": …, "mae": …, "r2": … }, …]
-    """
+    """Return all models with test-set metrics."""
     return get_metrics()

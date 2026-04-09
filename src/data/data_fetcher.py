@@ -1,6 +1,4 @@
-"""
-Data acquisition module for the geomagnetic forecasting project.
-"""
+"""Data acquisition module: downloads, parses, validates, and saves OMNI2 and DSCOVR data."""
 
 import calendar
 import time
@@ -22,24 +20,11 @@ def resolve_end_date(end_value: str) -> datetime:
     """Resolve the configured end date to a concrete datetime object.
 
     If ``end_value`` is ``"auto"``, returns the last day of the previous
-    calendar month relative to today.  Otherwise parses the value as an
-    ISO-format date string (``YYYY-MM-DD``).
-
-    Args:
-        end_value: The raw string from ``config.yaml`` — either ``"auto"``
-            or a fixed date such as ``"2026-01-31"``.
-
-    Returns:
-        A :class:`datetime` representing the resolved end date.
-
-    Raises:
-        ValueError: If ``end_value`` is neither ``"auto"`` nor a valid
-            ``YYYY-MM-DD`` date string.
+    calendar month. Otherwise parses the value as ``YYYY-MM-DD``.
     """
     if end_value.strip().lower() == "auto":
         today = datetime.now()
 
-        # Determine the previous month, rolling back across year boundaries.
         if today.month == 1:
             year, month = today.year - 1, 12
         else:
@@ -58,11 +43,7 @@ def resolve_end_date(end_value: str) -> datetime:
 
 
 class DataLoader:
-    """Orchestrates data acquisition, parsing, validation, and persistence.
-
-    Separating orchestration from parsing logic improves maintainability
-    and supports systematic experimentation (Martin, 2008).
-    """
+    """Orchestrates data acquisition, parsing, validation, and persistence."""
 
     def __init__(self, config_path: str = "config.yaml"):
         self.config = load_config(config_path)
@@ -74,20 +55,8 @@ class DataLoader:
 
         logger.info("DataLoader initialised.")
 
-    # OMNI2 historical data
-
     def download_omni2_year(self, year: int) -> bool:
-        """Download a single year of OMNI2 data.
-
-        Skips the download if the file already exists on disk.
-
-        Args:
-            year: The calendar year to download.
-
-        Returns:
-            ``True`` if the file is available (downloaded or pre-existing),
-            ``False`` if the download failed.
-        """
+        """Download a single year of OMNI2 data, skipping if already on disk."""
         omni_cfg = self.urls["omni2"]
         filename = omni_cfg["filename_pattern"].format(year=year)
         url = omni_cfg["base_url"] + filename
@@ -104,38 +73,19 @@ class DataLoader:
             out_path.write_bytes(response.content)
             return True
         except requests.RequestException as exc:
-            # Network or availability failures are logged rather than raised
-            # so that long-range historical downloads can complete partially
-            # (Lwakatare et al., 2020).
+            # Log rather than raise so that a long-range historical download
+            # can complete partially despite transient network failures.
             logger.error("Failed to download OMNI2 %d: %s", year, exc)
             return False
 
     def download_omni2_range(self, start_year: int, end_year: int) -> None:
-        """Download OMNI2 data for an inclusive range of years.
-
-        Args:
-            start_year: First year to download.
-            end_year: Last year to download (inclusive).
-        """
+        """Download OMNI2 data for an inclusive range of years."""
         for year in range(start_year, end_year + 1):
             self.download_omni2_year(year)
             time.sleep(0.5)
 
     def load_omni2_range(self, start_year: int, end_year: int) -> pd.DataFrame:
-        """Load and combine OMNI2 data across multiple years.
-
-        Chronological ordering and validation are essential to prevent
-        temporal leakage and ensure suitability for time-series models
-        (Cerqueira et al., 2020).
-
-        Args:
-            start_year: First year to load.
-            end_year: Last year to load (inclusive).
-
-        Returns:
-            A combined, chronologically sorted :class:`~pandas.DataFrame`,
-            or an empty DataFrame if no files are found.
-        """
+        """Load and combine OMNI2 data across multiple years into a single sorted DataFrame."""
         frames: list[pd.DataFrame] = []
 
         for year in range(start_year, end_year + 1):
@@ -159,22 +109,8 @@ class DataLoader:
         validate_omni_dataframe(combined)
         return combined
 
-    # DSCOVR real-time data
-
     def fetch_dscovr(self, kind: str) -> Optional[pd.DataFrame]:
-        """Fetch real-time DSCOVR solar wind data from NOAA SWPC.
-
-        This data is used for live forecasting only and is excluded from
-        model training to avoid inconsistencies between historical and
-        operational data streams (Cristoforetti et al., 2022).
-
-        Args:
-            kind: Either ``"mag"`` or ``"plasma"``.
-
-        Returns:
-            A parsed :class:`~pandas.DataFrame`, or ``None`` if the request
-            fails.
-        """
+        """Fetch real-time DSCOVR solar wind data from NOAA SWPC."""
         url = self.urls["dscovr"][kind]
 
         try:
@@ -184,15 +120,8 @@ class DataLoader:
         except requests.RequestException:
             return None
 
-    # Persistence
-
     def save_csv(self, df: pd.DataFrame, filename: str) -> None:
-        """Save a DataFrame to CSV in the raw data directory.
-
-        Args:
-            df: The DataFrame to save.
-            filename: Output filename (relative to ``raw_dir``).
-        """
+        """Save a DataFrame to CSV in the raw data directory."""
         if df.empty:
             logger.warning("Empty DataFrame — skipping save: %s", filename)
             return
@@ -203,12 +132,7 @@ class DataLoader:
 
 
 def main() -> None:
-    """Entry point for the data acquisition pipeline.
-
-    Resolves the configured end date, downloads all required OMNI2 annual
-    files, combines them into a single CSV, and fetches the latest DSCOVR
-    real-time feeds.
-    """
+    """Entry point for the data acquisition pipeline."""
     loader = DataLoader()
 
     date_range_cfg = loader.config["data"]["date_range"]

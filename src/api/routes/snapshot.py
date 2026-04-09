@@ -1,4 +1,4 @@
-"""GET /api/snapshot?idx=142 – returns all model predictions at a single timestep."""
+"""GET /api/snapshot?idx=142 — returns all model predictions at a single timestep."""
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -9,12 +9,7 @@ router = APIRouter()
 
 @router.get("/snapshot")
 def get_snapshot(idx: int = Query(default=0, ge=0, description="Zero-based timestep index")):
-    """
-    Return every model's prediction at one timestep.
-
-        { "idx": 142, "dt": "…", "lat": 63.2, "cl": "q", "true": 0.088,
-          "models": { "rf": …, "lr": …, "ls": …, "gr": …, "pe": … } }
-    """
+    """Return every model's prediction at one timestep."""
     df = load_aligned_predictions()
 
     if idx >= len(df):

@@ -13,25 +13,7 @@ router = APIRouter()
 
 @router.get("/forecast")
 def get_forecast():
-    """Generate and return a 7-day geomagnetic storm severity forecast.
-
-    Fetches real-time DSCOVR solar wind data, seeds all five trained models,
-    and runs a 28-step autoregressive forecast in 6-hour blocks.
-
-    Returns a JSON object containing:
-        - ``generated_at``: UTC timestamp of forecast generation.
-        - ``steps``: Number of forecast steps (28).
-        - ``step_hours``: Hours between steps (6).
-        - ``frozen_conditions_assumed``: ``true`` — current solar wind
-          conditions are held constant across all forecast steps.
-        - ``timestamps``: List of forecast timestamp strings.
-        - ``models``: Per-model arrays of ``ssi``, ``auroral_lat``,
-          and ``storm_class``.
-
-    Raises:
-        HTTPException: 503 if the DSCOVR feed is unavailable or the
-            seed window cannot be constructed.
-    """
+    """Generate and return a 7-day geomagnetic storm severity forecast."""
     result = generate_forecast()
 
     if result is None:

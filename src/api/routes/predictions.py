@@ -1,4 +1,4 @@
-"""GET /api/predictions?model=rf – returns the full test-set time series for one model."""
+"""GET /api/predictions?model=rf — returns the full test-set time series for one model."""
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -11,11 +11,7 @@ VALID_MODELS = {"rf", "lr", "ls", "gr", "pe"}
 
 @router.get("/predictions")
 def get_predictions(model: str = Query(default="rf", description="Model key: rf | lr | ls | gr | pe")):
-    """
-    Return columnar arrays for compact transfer.
-
-        { "model": "rf", "n": 3400, "dt": […], "lat": […], "cl": […], "true": […], "pred": […] }
-    """
+    """Return columnar prediction arrays for compact transfer."""
     if model not in VALID_MODELS:
         raise HTTPException(400, detail=f"Unknown model '{model}'. Valid: {sorted(VALID_MODELS)}")
 
@@ -29,4 +25,5 @@ def get_predictions(model: str = Query(default="rf", description="Model key: rf 
         "cl": df["storm_class"].tolist(),
         "true": df["true"].tolist(),
         "pred": df[model].tolist(),
+        "all": {m: df[m].tolist() for m in VALID_MODELS},
     }
