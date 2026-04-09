@@ -1,46 +1,35 @@
-"""
-Data validation utilities for geomagnetic forecasting project.
-"""
+"""Schema, continuity, and physical-bounds validators for OMNI2 input data."""
 
 import logging
-from typing import Dict, Any
+from typing import Any
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Expected schema for OMNI2 data after parsing.
-# Explicit schema validation ensures consistency between experiments
-# and prevents silent downstream failures (Martin, 2008).
 REQUIRED_COLUMNS = {"datetime", "bt", "bz_gsm", "speed", "density", "dst"}
 
-# Physical bounds are derived from empirical observations of the
-# near-Earth solar wind and geomagnetic response.
-# Values outside these ranges typically indicate sensor errors,
-# data corruption, or upstream processing artefacts rather than
-# true physical extremes (Liemohn et al., 2021).
-
-# NOTE:
-# These limits are intentionally broader than those used in preprocessing.
-# Validators report potential anomalies; preprocessing applies stricter,
-# experiment-specific bounds defined in config.yaml.
+# Broader than the preprocessing bounds in config.yaml — validators report
+# anomalies rather than enforcing experiment-specific filtering.
 PHYSICAL_LIMITS = {
-    "bt": (0.0, 50.0),  # nT
+    "bt": (0.0, 50.0),       # nT
     "bz_gsm": (-100.0, 100.0),  # nT
-    "speed": (200.0, 2000.0),  # km/s
-    "density": (0.0, 100.0),  # particles / cm^3
-    "dst": (-500.0, 100.0),  # nT
+    "speed": (200.0, 2000.0),   # km/s
+    "density": (0.0, 100.0),    # particles / cm³
+    "dst": (-500.0, 100.0),     # nT
 }
 
 
 def validate_schema(df: pd.DataFrame) -> None:
+    """Raise ``ValueError`` if any required columns are absent."""
     missing = REQUIRED_COLUMNS - set(df.columns)
     if missing:
         raise ValueError(
             f"OMNI2 schema validation failed: missing columns {missing}")
 
 
-def check_missing_data(df: pd.DataFrame) -> Dict[str, Any]:
+def check_missing_data(df: pd.DataFrame) -> dict[str, Any]:
+    """Return overall and per-column missing-value percentages."""
     overall_pct = (df.isnull().sum().sum() / df.size) * 100
 
     per_column = (
@@ -57,21 +46,8 @@ def check_missing_data(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
-def check_date_continuity(df: pd.DataFrame) -> Dict[str, Any]:
-    """
-    Identify temporal gaps in hourly OMNI2 data.
-
-    Continuous sampling is a key assumption for many time series
-    forecasting methods, including LSTMs
-    (Box et al., 2015; Cerqueira et al., 2020).
-    """
-
-    # Temporal gaps are reported rather than automatically filled.
-    # Imputation strategies can introduce bias in downstream models
-    # and are therefore deferred to the modelling stage, where
-    # assumptions can be explicitly controlled
-    # (Cerqueira et al., 2020; Liemohn et al., 2021).
-
+def check_date_continuity(df: pd.DataFrame) -> dict[str, Any]:
+    """Identify temporal gaps in hourly OMNI2 data."""
     df_sorted = df.sort_values("datetime")
     deltas = df_sorted["datetime"].diff().dropna()
 
@@ -80,6 +56,7 @@ def check_date_continuity(df: pd.DataFrame) -> Dict[str, Any]:
         index=deltas.index,
     )
 
+    # Gaps are reported rather than filled; imputation is deferred to the modelling stage.
     gaps = hours[hours > 1.0]
 
     return {
@@ -89,8 +66,9 @@ def check_date_continuity(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
-def check_physical_outliers(df: pd.DataFrame) -> Dict[str, Any]:
-    outliers: Dict[str, Dict[str, float]] = {}
+def check_physical_outliers(df: pd.DataFrame) -> dict[str, Any]:
+    """Return per-column counts and percentages of values outside physical bounds."""
+    outliers: dict[str, dict[str, float]] = {}
 
     for col, (low, high) in PHYSICAL_LIMITS.items():
         if col not in df.columns:
@@ -108,10 +86,8 @@ def check_physical_outliers(df: pd.DataFrame) -> Dict[str, Any]:
     return outliers
 
 
-def validate_omni_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
-    """
-    Primary OMNI2 validation entry point.
-    """
+def validate_omni_dataframe(df: pd.DataFrame) -> dict[str, Any]:
+    """Run all OMNI2 validation checks and return a summary dict."""
     if df.empty:
         raise ValueError("OMNI2 validation failed: DataFrame is empty")
 
@@ -125,19 +101,11 @@ def validate_omni_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
-def validate_preprocessed_data(summary: Dict[str, Any]) -> None:
-    """
-    Validate preprocessed data meets minimum requirements for ML training.
-
-    Enforcing minimum dataset sizes reduces the risk of unstable training
-    dynamics and unreliable evaluation metrics
-    (Breiman, 2001; Liemohn et al., 2021).
-    """
-
-    # Minimum sample requirements for reliable ML training
-    MIN_TRAIN_SAMPLES = 1000
-    MIN_VAL_SAMPLES = 200
-    MIN_TEST_SAMPLES = 200
+def validate_preprocessed_data(summary: dict[str, Any]) -> None:
+    """Raise ``ValueError`` if the preprocessing summary fails minimum-size checks."""
+    min_train_samples = 1000
+    min_val_samples = 200
+    min_test_samples = 200
 
     required_keys = {
         "train_samples",
@@ -153,17 +121,17 @@ def validate_preprocessed_data(summary: Dict[str, Any]) -> None:
     if missing:
         raise ValueError(f"Preprocessing summary missing keys: {missing}")
 
-    if summary["train_samples"] < MIN_TRAIN_SAMPLES:
+    if summary["train_samples"] < min_train_samples:
         raise ValueError(
             f"Insufficient training samples: {summary['train_samples']}"
         )
 
-    if summary["val_samples"] < MIN_VAL_SAMPLES:
+    if summary["val_samples"] < min_val_samples:
         raise ValueError(
             f"Insufficient validation samples: {summary['val_samples']}"
         )
 
-    if summary["test_samples"] < MIN_TEST_SAMPLES:
+    if summary["test_samples"] < min_test_samples:
         raise ValueError(
             f"Insufficient test samples: {summary['test_samples']}"
         )
@@ -174,4 +142,4 @@ def validate_preprocessed_data(summary: Dict[str, Any]) -> None:
     if summary["n_features"] != len(summary["feature_names"]):
         raise ValueError("Feature count mismatch")
 
-    logger.info("✓ Preprocessed data validation passed")
+    logger.info("Preprocessed data validation passed.")

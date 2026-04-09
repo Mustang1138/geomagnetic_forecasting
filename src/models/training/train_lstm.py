@@ -1,15 +1,8 @@
-"""
-LSTM training entry point for geomagnetic storm severity forecasting.
-
-Delegates all training logic to :class:`~src.models.training.train_utils.Trainer`,
-keeping this script focused solely on LSTM-specific configuration.
-
-References:
-    - Hochreiter & Schmidhuber (1997) — LSTM architecture
-    - Cerqueira et al. (2020) — time-series evaluation best practices
-"""
+"""Entry point for training the LSTM storm severity regressor."""
 
 from pathlib import Path
+
+import torch.nn as nn
 
 from src.models.temporal_model import LSTMRegressor
 from src.models.training.train_utils import Trainer, TrainingConfig
@@ -23,16 +16,20 @@ def train_lstm(
         output_dir: str = "outputs/temporal",
         num_epochs: int | None = None,
         batch_size: int | None = None,
-) -> None:
+) -> nn.Module:
     """Train the LSTM regressor using configuration from ``config.yaml``.
 
-    Args:
-        data_dir: Directory containing preprocessed ``.npy`` arrays and
-            ``scaler_y.pkl``.
-        output_dir: Directory to which the model checkpoint and prediction
-            CSV are written.
-        num_epochs: Override the epoch count from config (used in testing).
-        batch_size: Override the batch size from config (used in testing).
+    Parameters
+    ----------
+    num_epochs
+        Overrides the epoch count from config; used in testing.
+    batch_size
+        Overrides the batch size from config; used in testing.
+
+    Returns
+    -------
+    nn.Module
+        Trained LSTM with the best validation weights, on CPU.
     """
     config = load_config()
     lstm_cfg = config["models"]["lstm"]
@@ -48,13 +45,10 @@ def train_lstm(
         patience=lstm_cfg["patience"],
         data_dir=Path(data_dir),
         output_dir=Path(output_dir),
-        # Load LSTM-specific sequence arrays (X_train_lstm.npy etc.) generated
-        # by preprocess.py using the LSTM sequence_length from config.yaml.
-        data_prefix="lstm",
+        sequence_file_prefix="lstm",
     )
 
-    trainer = Trainer(model_class=LSTMRegressor, cfg=cfg)
-    trainer.run()
+    return Trainer(model_class=LSTMRegressor, cfg=cfg).run()
 
 
 if __name__ == "__main__":

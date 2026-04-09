@@ -1,16 +1,9 @@
-"""
-Shared training utilities for temporal sequence models.
-
-Centralising the training loop, validation loop, and early stopping logic
-here eliminates duplication between the LSTM and GRU training scripts and
-makes each component independently testable (Martin, 2008).
-"""
+"""Shared training loop, validation loop, and early-stopping logic for recurrent models."""
 
 import logging
 import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Type
 
 import numpy as np
 import pandas as pd
@@ -21,32 +14,9 @@ from torch.utils.data import DataLoader, TensorDataset
 logger = logging.getLogger(__name__)
 
 
-# Configuration dataclass
-
 @dataclass
 class TrainingConfig:
-    """Hyperparameters and path settings for a single training run.
-
-    Attributes:
-        model_name: Identifier used for log messages and output filenames
-            (e.g. ``"lstm"`` or ``"gru"``).
-        hidden_size: Number of units in each recurrent layer.
-        num_layers: Number of stacked recurrent layers.
-        dropout: Dropout probability applied between recurrent layers.
-        learning_rate: Adam optimiser learning rate.
-        batch_size: Mini-batch size for the training DataLoader.
-        epochs: Maximum number of training epochs.
-        patience: Number of epochs without validation improvement before
-            early stopping is triggered.
-        data_dir: Directory containing the preprocessed ``.npy`` arrays
-            and ``scaler_y.pkl``.
-        output_dir: Directory to which the best model checkpoint and
-            prediction CSV are written.
-        data_prefix: Model-specific suffix used to select the correct set
-            of sequence arrays (e.g. ``"lstm"`` loads ``X_train_lstm.npy``).
-            Falls back to the legacy unprefixed filenames if no prefixed
-            file is found, preserving backwards compatibility.
-    """
+    """Hyperparameters and path settings for a single training run."""
 
     model_name: str
     hidden_size: int
@@ -58,54 +28,43 @@ class TrainingConfig:
     patience: int = 16
     data_dir: Path = field(default_factory=lambda: Path("data/processed"))
     output_dir: Path = field(default_factory=lambda: Path("outputs/temporal"))
-    # Model-specific prefix for sequence array filenames.
-    # Enables LSTM and GRU to load their own independently generated
-    # sequence arrays (e.g. X_train_lstm.npy vs X_train_gru.npy),
-    # ensuring each model trains on windows of the correct length.
-    data_prefix: str = ""
+    # Falls back to unprefixed filenames if the prefixed file is not found.
+    sequence_file_prefix: str = ""
 
-
-# Data loading helpers
 
 def _load_split(
         data_dir: Path,
         split: str,
         prefix: str = "",
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Load a preprocessed split from disk.
+    """Load a preprocessed split from disc, trying prefixed files before legacy fallbacks.
 
-    Lookup order:
-        1. Prefixed ``.npy`` files (e.g. ``X_train_lstm.npy``) — preferred,
-           ensures each model loads its own independently windowed arrays.
-        2. Unprefixed ``.npy`` files (legacy fallback — e.g. ``X_train.npy``).
-        3. ``.npz`` archive (legacy fallback).
+    Parameters
+    ----------
+    data_dir
+        Directory containing the preprocessed arrays.
+    split
+        One of ``"train"``, ``"val"``, or ``"test"``.
+    prefix
+        Optional model-specific suffix (e.g. ``"lstm"`` or ``"gru"``);
+        prefixed files are tried first.
 
-    Args:
-        data_dir: Directory containing the preprocessed arrays.
-        split: One of ``"train"``, ``"val"``, or ``"test"``.
-        prefix: Optional model-specific suffix (e.g. ``"lstm"`` or ``"gru"``).
-            When provided, prefixed files are tried first.
-
-    Returns:
-        A tuple ``(X, y)`` of NumPy arrays.
-
-    Raises:
-        FileNotFoundError: If no suitable files exist for the requested split.
+    Returns
+    -------
+    tuple
+        ``(X, y)`` NumPy arrays for the requested split.
     """
-    # 1. Prefixed .npy files (model-specific arrays)
     if prefix:
         npy_x = data_dir / f"X_{split}_{prefix}.npy"
         npy_y = data_dir / f"y_{split}_{prefix}.npy"
         if npy_x.exists() and npy_y.exists():
             return np.load(npy_x), np.load(npy_y)
 
-    # 2. Legacy unprefixed .npy files
     npy_x = data_dir / f"X_{split}.npy"
     npy_y = data_dir / f"y_{split}.npy"
     if npy_x.exists() and npy_y.exists():
         return np.load(npy_x), np.load(npy_y)
 
-    # 3. Legacy .npz archive
     npz = data_dir / f"{split}.npz"
     if npz.exists():
         with np.load(npz) as archive:
@@ -122,24 +81,10 @@ def build_dataloader(
         X: np.ndarray,
         y: np.ndarray,
         batch_size: int,
-        shuffle: bool = False,
+        shuffle: bool = False,  # disabled by default to preserve temporal ordering
         pin_memory: bool = True,
 ) -> DataLoader:
-    """Wrap NumPy arrays in a PyTorch DataLoader.
-
-    Shuffling is disabled by default to preserve temporal ordering, which
-    is critical for time-series evaluation (Cerqueira et al., 2020).
-
-    Args:
-        X: Input sequences of shape ``(N, seq_len, n_features)``.
-        y: Target values of shape ``(N,)`` or ``(N, 1)``.
-        batch_size: Mini-batch size.
-        shuffle: Whether to shuffle samples each epoch.
-        pin_memory: Whether to pin memory for faster GPU transfer.
-
-    Returns:
-        A configured :class:`~torch.utils.data.DataLoader`.
-    """
+    """Wrap NumPy arrays in a PyTorch DataLoader."""
     dataset = TensorDataset(
         torch.tensor(X, dtype=torch.float32),
         torch.tensor(y, dtype=torch.float32).squeeze(-1),
@@ -152,8 +97,6 @@ def build_dataloader(
     )
 
 
-# Training and validation loops
-
 def run_epoch(
         model: nn.Module,
         loader: DataLoader,
@@ -161,18 +104,7 @@ def run_epoch(
         optimiser: torch.optim.Optimizer,
         device: torch.device,
 ) -> float:
-    """Run a single training epoch.
-
-    Args:
-        model: The model to train.
-        loader: DataLoader providing mini-batches.
-        criterion: Loss function.
-        optimiser: Parameter update rule.
-        device: Compute device.
-
-    Returns:
-        Mean training loss over all mini-batches.
-    """
+    """Run one training epoch and return the mean loss."""
     model.train()
     total_loss = 0.0
 
@@ -197,17 +129,7 @@ def run_validation(
         criterion: nn.Module,
         device: torch.device,
 ) -> float:
-    """Evaluate the model on a validation set without updating weights.
-
-    Args:
-        model: The model to evaluate.
-        loader: DataLoader providing validation mini-batches.
-        criterion: Loss function.
-        device: Compute device.
-
-    Returns:
-        Mean validation loss over all mini-batches.
-    """
+    """Return mean validation loss without updating model weights."""
     model.eval()
     total_loss = 0.0
 
@@ -222,8 +144,6 @@ def run_validation(
     return total_loss / len(loader)
 
 
-# Inference and output helpers
-
 def run_inference(
         model: nn.Module,
         X_test: np.ndarray,
@@ -231,18 +151,12 @@ def run_inference(
         scaler_y_path: Path,
         device: torch.device,
 ) -> pd.DataFrame:
-    """Generate test-set predictions and inverse-scale them to physical units.
+    """Generate test-set predictions and inverse-scale them to physical SSI units.
 
-    Args:
-        model: Trained model in eval mode.
-        X_test: Test input sequences.
-        y_test: Scaled test targets.
-        scaler_y_path: Path to the fitted ``scaler_y.pkl``.
-        device: Compute device.
-
-    Returns:
-        A DataFrame with columns ``y_true`` and ``y_pred`` in physical
-        (unscaled) SSI units.
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns ``y_true`` and ``y_pred`` in unscaled SSI units.
     """
     model.eval()
 
@@ -260,22 +174,14 @@ def run_inference(
     return pd.DataFrame({"y_true": y_true_inv, "y_pred": y_pred_inv})
 
 
-# Main trainer
-
 class Trainer:
-    """Orchestrates training, early stopping, and inference for a recurrent model.
+    """Orchestrates training, early stopping, and test inference for a recurrent model.
 
-    Model-agnostic: any :class:`~torch.nn.Module` whose ``forward`` method
-    accepts a tensor of shape ``(batch, seq_len, n_features)`` and returns
-    a tensor of shape ``(batch,)`` is compatible.
-
-    Args:
-        model_class: The recurrent model class to instantiate
-            (e.g. :class:`~src.models.temporal_model.LSTMRegressor`).
-        cfg: Hyperparameters and path settings for this run.
+    Any ``nn.Module`` whose ``forward`` method accepts ``(batch, seq_len, n_features)``
+    and returns ``(batch,)`` is compatible.
     """
 
-    def __init__(self, model_class: Type[nn.Module], cfg: TrainingConfig):
+    def __init__(self, model_class: type[nn.Module], cfg: TrainingConfig):
         self._model_class = model_class
         self._cfg = cfg
         self._device = torch.device(
@@ -284,27 +190,15 @@ class Trainer:
         logger.info("Trainer initialised on device: %s", self._device)
 
     def run(self) -> nn.Module:
-        """Execute the full training pipeline.
-
-        Loads model-specific sequence arrays, trains with early stopping,
-        runs test inference, saves predictions, and returns the best model.
-
-        Returns:
-            The trained model with the best validation weights, on CPU.
-        """
+        """Execute the full training pipeline and return the best model on CPU."""
         cfg = self._cfg
 
-        # Load model-specific sequence arrays.
-        # cfg.data_prefix (e.g. "lstm" or "gru") selects the correct set
-        # of .npy files, ensuring each model trains on windows of the
-        # sequence length it was configured for.
-        X_train, y_train = _load_split(cfg.data_dir, "train", cfg.data_prefix)
-        X_val, y_val = _load_split(cfg.data_dir, "val", cfg.data_prefix)
+        X_train, y_train = _load_split(cfg.data_dir, "train", cfg.sequence_file_prefix)
+        X_val, y_val = _load_split(cfg.data_dir, "val", cfg.sequence_file_prefix)
 
         train_loader = build_dataloader(X_train, y_train, cfg.batch_size)
         val_loader = build_dataloader(X_val, y_val, batch_size=256)
 
-        # Initialise model
         input_size = X_train.shape[2]
 
         model = self._model_class(
@@ -316,12 +210,10 @@ class Trainer:
         criterion = nn.MSELoss()
         optimiser = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
 
-        # Output paths
         model_dir = cfg.output_dir / "models"
         model_dir.mkdir(parents=True, exist_ok=True)
         checkpoint_path = model_dir / f"{cfg.model_name}_best.pt"
 
-        # Training loop with early stopping
         best_val_loss = float("inf")
         patience_counter = 0
 
@@ -351,7 +243,6 @@ class Trainer:
                     )
                     break
 
-        # Test inference
         model.load_state_dict(
             torch.load(checkpoint_path, map_location=self._device)
         )
@@ -359,7 +250,7 @@ class Trainer:
         scaler_path = cfg.data_dir / "scaler_y.pkl"
 
         try:
-            X_test, y_test = _load_split(cfg.data_dir, "test", cfg.data_prefix)
+            X_test, y_test = _load_split(cfg.data_dir, "test", cfg.sequence_file_prefix)
         except FileNotFoundError:
             logger.warning(
                 "Test data not found — skipping inference for %s.",

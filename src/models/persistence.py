@@ -1,37 +1,21 @@
-"""
-Persistence (naïve) baseline for time series forecasting.
-
-This baseline predicts the next timestep value as the current value:
-    y_hat[t+1] = y[t]
-
-It serves as a lower-bound benchmark for temporal models.
-"""
-
-from typing import Tuple
+"""Persistence baseline that predicts each timestep as the value of the previous one."""
 
 import numpy as np
 
 
-def persistence_forecast(y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Generate persistence (t → t+1) predictions.
+def persistence_forecast(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return ground-truth and persistence predictions aligned by one timestep.
 
     Parameters
     ----------
-    y : np.ndarray
-        Target time series of shape (T,).
+    y
+        1-D target time series of length T.
 
     Returns
     -------
-    y_true : np.ndarray
-        Ground-truth values from t=1..T-1.
-    y_pred : np.ndarray
-        Persistence predictions from t=0..T-2.
-
-    Raises
-    ------
-    ValueError
-        If input has fewer than 2 timesteps.
+    tuple
+        ``(y_true, y_pred)`` where ``y_true`` spans t=1…T-1 and
+        ``y_pred`` spans t=0…T-2 (i.e. the previous value as the forecast).
     """
     if y.ndim != 1:
         raise ValueError("y must be a 1D array")
@@ -39,7 +23,4 @@ def persistence_forecast(y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     if len(y) < 2:
         raise ValueError("Persistence baseline requires at least 2 timesteps")
 
-    y_pred = y[:-1]
-    y_true = y[1:]
-
-    return y_true, y_pred
+    return y[1:], y[:-1]

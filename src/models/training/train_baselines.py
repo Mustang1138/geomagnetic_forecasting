@@ -1,9 +1,4 @@
-"""
-Run all baseline models and generate prediction artefacts.
-
-Consumes frozen preprocessed datasets and produces prediction CSVs
-for downstream evaluation.
-"""
+"""Entry point for training all non-temporal baseline regression models."""
 
 from src.models.baseline_models import BaselineTrainer
 from src.utils import setup_logging
@@ -12,15 +7,9 @@ logger = setup_logging()
 
 
 def main():
-    """
-    Train baseline regression models (Linear Regression, Random Forest).
-    """
+    """Train Linear Regression and Random Forest baselines and save prediction artefacts."""
     logger.info("Running baseline model training")
-
-    # Non-temporal ML baselines
-    trainer = BaselineTrainer()
-    trainer.run()
-
+    BaselineTrainer().run()
     logger.info("Baseline model training complete")
 
 
