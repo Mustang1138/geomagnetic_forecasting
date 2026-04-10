@@ -1,31 +1,29 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
-import type {ModelKey} from '../utils'
+import type {ModelKey, ModelMetrics, Snapshot, TimelineData} from '../utils'
 
-const BASE = '/api'
+const API_BASE_URL = '/api'
 
-// In-memory cache so switching models is instant on revisit
-const _cache: Record<string, any> = {}
-
-// Hooks
+// In-memory cache so switching models is instant on revisit.
+const predictionCache: Record<string, TimelineData> = {}
 
 /** Fetches the list of available models and their evaluation metrics. */
 export function useModels() {
-    const [models, setModels] = useState<any[]>([])
+    const [models, setModels] = useState<ModelMetrics[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
-        fetch(`${BASE}/models`)
-            .then(r => {
-                if (!r.ok) throw new Error(r.statusText);
-                return r.json()
+        fetch(`${API_BASE_URL}/models`)
+            .then(response => {
+                if (!response.ok) throw new Error(response.statusText)
+                return response.json() as Promise<ModelMetrics[]>
             })
             .then(data => {
-                setModels(data);
+                setModels(data)
                 setLoading(false)
             })
-            .catch(e => {
-                setError(e.message);
+            .catch((error: Error) => {
+                setError(error.message)
                 setLoading(false)
             })
     }, [])
@@ -35,36 +33,36 @@ export function useModels() {
 
 /** Fetches the full prediction time series for a given model key. */
 export function usePredictions(modelKey: ModelKey) {
-    const [data, setData] = useState<any>(null)
+    const [data, setData] = useState<TimelineData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
-    // Track the in-flight key so responses from a previous model are discarded
-    const activeKey = useRef(modelKey)
+    const activeModelKey = useRef(modelKey)
 
     useEffect(() => {
-        activeKey.current = modelKey
+        activeModelKey.current = modelKey
 
-        if (_cache[modelKey]) {
-            setData(_cache[modelKey])
+        if (predictionCache[modelKey]) {
+            setData(predictionCache[modelKey])
             setLoading(false)
             return
         }
 
         setLoading(true)
-        fetch(`${BASE}/predictions?model=${modelKey}`)
-            .then(r => {
-                if (!r.ok) throw new Error(r.statusText);
-                return r.json()
+        fetch(`${API_BASE_URL}/predictions?model=${modelKey}`)
+            .then(response => {
+                if (!response.ok) throw new Error(response.statusText)
+                return response.json() as Promise<TimelineData>
             })
             .then(payload => {
-                if (activeKey.current !== modelKey) return   // stale response – discard
-                _cache[modelKey] = payload
+                // Discard responses that arrived after the model key changed.
+                if (activeModelKey.current !== modelKey) return
+                predictionCache[modelKey] = payload
                 setData(payload)
                 setLoading(false)
             })
-            .catch(e => {
-                setError(e.message);
+            .catch((error: Error) => {
+                setError(error.message)
                 setLoading(false)
             })
     }, [modelKey])
@@ -74,19 +72,18 @@ export function usePredictions(modelKey: ModelKey) {
 
 /** Fetches a single-timestep snapshot of all model predictions. */
 export function useSnapshot(idx: number) {
-    const [snapshot, setSnapshot] = useState<any>(null)
+    const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
 
-    const fetch_ = useCallback((i: number) => {
-        fetch(`${BASE}/snapshot?idx=${i}`)
-            .then(r => r.json())
+    const fetchSnapshot = useCallback((i: number) => {
+        fetch(`${API_BASE_URL}/snapshot?idx=${i}`)
+            .then(response => response.json() as Promise<Snapshot>)
             .then(setSnapshot)
-            .catch(() => {
-            })
+            .catch(() => {})
     }, [])
 
     useEffect(() => {
-        if (idx !== null) fetch_(idx)
-    }, [idx, fetch_])
+        if (idx !== null) fetchSnapshot(idx)
+    }, [idx, fetchSnapshot])
 
     return snapshot
 }

@@ -2,7 +2,7 @@ import {useCallback, useEffect, useRef} from 'react'
 import {MODEL_META, ssiColor} from '../utils'
 import type {ForecastData} from '../hooks/useForecast'
 import {xAt, yAt} from '../canvas/chartUtils'
-import {C, SEVERITY_BANDS} from '../theme'
+import {CANVAS_COLOURS, SEVERITY_BANDS} from '../theme'
 
 interface Props {
     data: ForecastData
@@ -38,7 +38,7 @@ export default function ForecastChart({data, currentIdx, onSeek}: Props) {
         const xi = (i: number) => xAt(i, n, pad, iW)
         const yi = (v: number) => yAt(v, maxV, pad, H)
 
-        ctx.fillStyle = C.surface
+        ctx.fillStyle = CANVAS_COLOURS.surface
         ctx.fillRect(0, 0, W, H)
 
         for (const {min, max, color} of SEVERITY_BANDS) {

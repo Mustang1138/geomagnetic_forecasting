@@ -2,7 +2,7 @@ import {useCallback, useEffect, useRef} from 'react'
 import {MODEL_META, ssiColor} from '../utils'
 import type {TimelineData} from '../utils'
 import {xAt, yAt} from '../canvas/chartUtils'
-import {C, SEVERITY_BANDS} from '../theme'
+import {CANVAS_COLOURS, SEVERITY_BANDS} from '../theme'
 
 interface Props {
     data: TimelineData
@@ -34,7 +34,7 @@ export default function TimelineChart({data, modelKey, currentIdx, onSeek}: Prop
         const xi = (i: number) => xAt(i, n, pad, iW)
         const yi = (v: number) => yAt(v, maxV, pad, H)
 
-        ctx.fillStyle = C.surface
+        ctx.fillStyle = CANVAS_COLOURS.surface
         ctx.fillRect(0, 0, W, H)
 
         for (const {min, max, color} of SEVERITY_BANDS) {
@@ -52,7 +52,7 @@ export default function TimelineChart({data, modelKey, currentIdx, onSeek}: Prop
         ctx.setLineDash([])
         ctx.stroke()
 
-        const color = MODEL_META.find(m => m.key === modelKey)?.color ?? C.accent
+        const color = MODEL_META.find(m => m.key === modelKey)?.color ?? CANVAS_COLOURS.accent
         ctx.beginPath()
         pred.forEach((v, i) => i === 0 ? ctx.moveTo(xi(i), yi(v)) : ctx.lineTo(xi(i), yi(v)))
         ctx.strokeStyle = color

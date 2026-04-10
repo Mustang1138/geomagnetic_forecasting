@@ -1,8 +1,6 @@
 import {useEffect, useState} from 'react'
 import type {ModelKey} from '../utils'
 
-// Types
-
 export interface ModelForecast {
     ssi: number[]
     auroral_lat: number[]
@@ -18,15 +16,7 @@ export interface ForecastData {
     models: Record<ModelKey, ModelForecast>
 }
 
-// Hook
-
-/**
- * Fetches the 7-day forecast from /api/forecast.
- *
- * Unlike usePredictions, forecast data is not cached between renders — a
- * fresh fetch is performed each time the component mounts so that the
- * forecast always reflects the latest DSCOVR conditions.
- */
+/** Fetches the 7-day forecast from /api/forecast; performs a fresh fetch on each mount. */
 export function useForecast() {
     const [data, setData] = useState<ForecastData | null>(null)
     const [loading, setLoading] = useState(true)
@@ -37,16 +27,16 @@ export function useForecast() {
         setError(null)
 
         fetch('/api/forecast')
-            .then(r => {
-                if (!r.ok) throw new Error(`Forecast API returned ${r.status}: ${r.statusText}`)
-                return r.json() as Promise<ForecastData>
+            .then(response => {
+                if (!response.ok) throw new Error(`Forecast API returned ${response.status}: ${response.statusText}`)
+                return response.json() as Promise<ForecastData>
             })
             .then(payload => {
                 setData(payload)
                 setLoading(false)
             })
-            .catch((e: Error) => {
-                setError(e.message)
+            .catch((error: Error) => {
+                setError(error.message)
                 setLoading(false)
             })
     }, [])
