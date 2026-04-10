@@ -1,40 +1,48 @@
-import type {ModelKey} from '../utils'
+import type {ModelKey, ModelMetrics} from '../utils'
 import {MODEL_META} from '../utils'
 
 interface Props {
     activeModel: ModelKey
-    models: any[]   // live metrics from /api/models
+    models: ModelMetrics[]
     onSelect: (key: ModelKey) => void
 }
 
-// Component
-
+/** Button group for selecting the active forecast model, with inline RMSE and R² metrics. */
 export default function ModelSelector({activeModel, models, onSelect}: Props) {
     const meta = models.find(m => m.key === activeModel)
 
     return (
         <div style={{display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap'}}>
+            <span style={{fontSize: 11, color: 'var(--text-3)', marginRight: 2}}>Model</span>
+
             {MODEL_META.map(m => (
-                // Active model is disabled (visually pressed) and shown in bold
                 <button
                     key={m.key}
                     onClick={() => onSelect(m.key)}
                     disabled={m.key === activeModel}
-                    style={{fontWeight: m.key === activeModel ? 'bold' : 'normal'}}
+                    style={m.key === activeModel ? {
+                        borderColor: m.color,
+                        color: m.color,
+                        background: `${m.color}18`,
+                    } : undefined}
                 >
                     {m.label}
                 </button>
             ))}
 
-            {/* Show live metrics for the active model once the API responds */}
             {meta && (
-                <small style={{marginLeft: 8}}>
+                <span style={{
+                    marginLeft: 4,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    color: 'var(--text-3)',
+                }}>
                     RMSE <span style={{color: meta.color}}>{meta.rmse.toFixed(5)}</span>
                     {' · '}
                     MAE <span style={{color: meta.color}}>{meta.mae.toFixed(5)}</span>
                     {' · '}
                     R² <span style={{color: meta.color}}>{meta.r2.toFixed(4)}</span>
-                </small>
+                </span>
             )}
         </div>
     )

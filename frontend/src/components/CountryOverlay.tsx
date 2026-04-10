@@ -1,21 +1,52 @@
 import {useMemo} from 'react'
 import {Line} from '@react-three/drei'
 import * as THREE from 'three'
+import type {GeoJSONData} from '../utils'
+import {useVisibilityLookup} from '../hooks/useVisibilityLookup'
 
 interface Props {
-    geojson: any
-    color: string
-    aLat: number
-    view: 'north' | 'south' | 'rect'
+    geojson: GeoJSONData
+    ssi: number
+    hemisphere: 'north' | 'south' | 'both'
 }
 
-interface LineItem {
-    key: string
+interface LineData {
+    id: string
     points: [number, number, number][]
+    color: string
+    lineWidth: number
     opacity: number
 }
 
-// Geometry
+const SSI_BIN_EDGES = [0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
+const SSI_BIN_LABELS = [
+    '0.00-0.05', '0.05-0.10', '0.10-0.15', '0.15-0.20',
+    '0.20-0.25', '0.25-0.30', '0.30-0.35', '0.35-0.40',
+    '0.40-0.45', '0.45-0.50', '>0.50',
+]
+
+function getSsiBin(ssi: number): string {
+    for (let i = 0; i < SSI_BIN_EDGES.length - 1; i++) {
+        if (ssi >= SSI_BIN_EDGES[i] && ssi < SSI_BIN_EDGES[i + 1]) return SSI_BIN_LABELS[i]
+    }
+    return '>0.50'
+}
+
+function visibilityColour(fraction: number): string | null {
+    if (fraction <= 0) return null
+    if (fraction < 0.002) return '#22c55e'  // rare (<0.2%)
+    if (fraction < 0.01) return '#eab308'   // occasional (<1%)
+    if (fraction < 0.10) return '#f97316'   // moderate (<10%)
+    return '#ef4444'                          // frequent (>=10%)
+}
+
+function visibilityOpacity(fraction: number): number {
+    if (fraction <= 0) return 0
+    if (fraction < 0.002) return 0.35
+    if (fraction < 0.01) return 0.5
+    if (fraction < 0.10) return 0.65
+    return 0.85
+}
 
 function latLngToVec3(lat: number, lng: number, r: number): THREE.Vector3 {
     const phi = THREE.MathUtils.degToRad(90 - lat)
@@ -27,108 +58,84 @@ function latLngToVec3(lat: number, lng: number, r: number): THREE.Vector3 {
     )
 }
 
-/**
- * Closes a GeoJSON ring if the first and last vertices don't already match,
- * then projects each coordinate onto the sphere at radius r.
- */
-function ringToPoints(ring: number[][], r = 2.01): [number, number, number][] {
+function ringToPoints(ring: number[][], r = 2.02): [number, number, number][] {
     const closed =
         ring[0][0] === ring.at(-1)![0] && ring[0][1] === ring.at(-1)![1]
-            ? ring
-            : [...ring, ring[0]]
-
+            ? ring : [...ring, ring[0]]
     return closed.map(([lng, lat]) => {
         const v = latLngToVec3(lat, lng, r)
         return [v.x, v.y, v.z]
     })
 }
 
-// Shared render helper — keeps the two export components free of JSX duplication
+/** Country border overlay coloured by historical aurora visibility probability. */
+export default function CountryOverlay({geojson, ssi, hemisphere}: Props) {
+    const lookup = useVisibilityLookup()
+    const ssiBin = getSsiBin(ssi)
 
-function LineGroup({lines, color}: { lines: LineItem[]; color: string }) {
+    // Pure render-data computed outside JSX — safe to memoise in R3F.
+    const lineData = useMemo((): LineData[] => {
+        if (!geojson) return []
+        const result: LineData[] = []
+
+        geojson.features.forEach((feature, fi: number) => {
+            const p = feature.properties ?? {}
+            const lookupKey = p.iso_3166_2 || p.GU_A3 || ''
+            const meta = lookup?.[lookupKey]
+
+            if (meta) {
+                const metaHemi = meta.hemisphere === 'N' ? 'north' : 'south'
+                if (hemisphere !== 'both' && metaHemi !== hemisphere) return
+            }
+
+            const polygons: number[][][][] =
+                feature.geometry.type === 'MultiPolygon'
+                    ? (feature.geometry.coordinates as number[][][][])
+                    : [(feature.geometry.coordinates as number[][][])]
+
+            polygons.forEach((polygon: number[][][], pi: number) => {
+                const ring: number[][] = polygon[0]
+                const id = `${fi}-${pi}`
+
+                if (meta) {
+                    const fraction = meta.visibility[ssiBin] ?? 0
+                    const colour = visibilityColour(fraction)
+                    if (colour) {
+                        result.push({
+                            id, points: ringToPoints(ring),
+                            color: colour, lineWidth: 2,
+                            opacity: visibilityOpacity(fraction),
+                        })
+                    } else {
+                        result.push({
+                            id, points: ringToPoints(ring),
+                            color: '#334155', lineWidth: 1, opacity: 0.25,
+                        })
+                    }
+                } else {
+                    result.push({
+                        id, points: ringToPoints(ring),
+                        color: '#334155', lineWidth: 1, opacity: 0.15,
+                    })
+                }
+            })
+        })
+
+        return result
+    }, [geojson, lookup, ssiBin, hemisphere])
+
     return (
         <group>
-            {lines.map(({key, points, opacity}) => (
-                <Line key={key} points={points} color={color} lineWidth={2} transparent opacity={opacity}/>
+            {lineData.map(d => (
+                <Line
+                    key={d.id}
+                    points={d.points}
+                    color={d.color}
+                    lineWidth={d.lineWidth}
+                    transparent
+                    opacity={d.opacity}
+                />
             ))}
         </group>
     )
-}
-
-// Northern overlay
-
-/**
- * Symmetric Gaussian falloff (s = 10 deg) centred on the auroral oval.
- * Intensity and culling are computed inside useMemo so that changes to
- * aLat, color, and view correctly invalidate the output during playback.
- */
-export default function CountryOverlay({geojson, color, aLat, view}: Props) {
-    const lines = useMemo((): LineItem[] => {
-        if (!geojson) return []
-
-        return geojson.features.flatMap((feature: any, fi: number) => {
-            const polygons: any[] =
-                feature.geometry.type === 'MultiPolygon'
-                    ? feature.geometry.coordinates
-                    : [feature.geometry.coordinates]
-
-            return polygons.flatMap((polygon: any, pi: number) => {
-                const ring: number[][] = polygon[0]
-
-                const avgLat = ring.reduce((s, [, lat]) => s + lat, 0) / ring.length
-                const sign = view === 'south' ? -1 : 1
-                const dist = Math.abs(sign * avgLat - sign * aLat)
-                const intensity = Math.exp(-(dist * dist) / 200)   // 200 = 2 * s^2 where s = 10 deg
-
-                if (intensity <= 0.5) return []
-
-                return [{key: `${fi}-${pi}`, points: ringToPoints(ring), opacity: 0.1 + intensity * 0.5}]
-            })
-        })
-    }, [geojson, color, aLat, view])
-
-    return <LineGroup lines={lines} color={color}/>
-}
-
-// Southern overlay
-
-/**
- * Asymmetric equatorward-only falloff for the southern hemisphere (s = 15 deg).
- * Only countries equatorward of the oval are rendered, preventing the highlight
- * from bleeding into northern-hemisphere rendering.  Australia and New Zealand
- * (~35-46 S) become faintly visible when the oval descends to ~50-55 S during
- * stronger storms.
- */
-export function CountryOverlaySouth({geojson, color, aLat}: Omit<Props, 'view'>) {
-    const lines = useMemo((): LineItem[] => {
-        if (!geojson) return []
-
-        return geojson.features.flatMap((feature: any, fi: number) => {
-            const polygons: any[] =
-                feature.geometry.type === 'MultiPolygon'
-                    ? feature.geometry.coordinates
-                    : [feature.geometry.coordinates]
-
-            return polygons.flatMap((polygon: any, pi: number) => {
-                const ring: number[][] = polygon[0]
-
-                const avgLat = ring.reduce((s, [, lat]) => s + lat, 0) / ring.length
-
-                // Ignore northern-hemisphere polygons entirely
-                if (avgLat >= 0) return []
-
-                // offset > 0: country is equatorward of the oval (aurora potentially visible)
-                // offset < 0: country is poleward / inside the oval -- cull it
-                const offset = Math.abs(aLat) - Math.abs(avgLat)
-                if (offset < 0 || offset > 40) return []
-
-                const intensity = Math.exp(-(offset * offset) / 450)   // 450 = 2 * s^2 where s = 15 deg
-                if (intensity <= 0.15) return []
-
-                return [{key: `${fi}-${pi}`, points: ringToPoints(ring), opacity: 0.1 + intensity * 0.5}]
-            })
-        })
-    }, [geojson, color, aLat])
-
-    return <LineGroup lines={lines} color={color}/>
 }

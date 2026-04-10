@@ -3,66 +3,92 @@ import {Line, OrbitControls, Stars} from '@react-three/drei'
 import {useEffect, useMemo, useState} from 'react'
 import * as THREE from 'three'
 import {ssiColor} from '../utils'
-import CountryOverlay, {CountryOverlaySouth} from './CountryOverlay'
+import type {GeoJSONData} from '../utils'
+import {
+    buildGlowBand,
+    geoToVec,
+    GMAG_NORTH,
+    ringAroundCentre,
+    ringAtLatitude,
+} from '../geometry/aurora'
+import type {RingDef} from '../geometry/aurora'
+import CountryOverlay from './CountryOverlay'
 
 interface Props {
     ssi: number
-    aLat: number
+    auroralLatitudeDeg: number
     view: 'north' | 'south' | 'rect'
 }
 
-// Geometry
+function NorthOval({auroralLatitudeDeg, ssi, color}: { auroralLatitudeDeg: number; ssi: number; color: string }) {
+    // NH oval centred on the geomagnetic north pole (~80.7°N, 72.7°W) — correctly
+    // offset toward Canada rather than the geographic pole.
+    const gmagCentre = useMemo(() => geoToVec(GMAG_NORTH.lat, GMAG_NORTH.lon), [])
+    const glowBand = useMemo(() => buildGlowBand(ssi), [ssi])
 
-/** Generates a latitude ring as a closed array of 3-D points. */
-function generateRing(latDeg: number, radius: number, segments = 180): [number, number, number][] {
-    const lat = THREE.MathUtils.degToRad(latDeg)
-    return Array.from({length: segments + 1}, (_, i) => {
-        const a = (i / segments) * Math.PI * 2
-        return [
-            radius * Math.cos(lat) * Math.cos(a),
-            radius * Math.sin(lat),
-            radius * Math.cos(lat) * Math.sin(a),
-        ] as [number, number, number]
-    })
-}
+    const rings = useMemo(() => {
+        // Oval centre sits a few degrees poleward of the equatorward boundary.
+        const ovalCentreLat = auroralLatitudeDeg + 3.0 + ssi * 2
+        const ovalCentreColatitudeDeg = Math.max(2, GMAG_NORTH.lat - ovalCentreLat)
+        return glowBand.map((ring: RingDef) => ({...ring, colatDeg: ovalCentreColatitudeDeg + ring.offset}))
+    }, [auroralLatitudeDeg, ssi, glowBand])
 
-/** Returns inner/outer ring pair for a given signed latitude. */
-function auroraRings(lat: number, ssi: number) {
-    return {
-        inner: generateRing(lat - (2 + ssi * 2), 2.05),
-        outer: generateRing(lat + (2 + ssi * 5), 2.15),
-    }
-}
-
-// Sub-component
-
-interface AuroraOvalProps {
-    lat: number
-    ssi: number
-    color: string
-}
-
-/* Renders one auroral oval (inner bright band + outer diffuse fringe). */
-function AuroraOval({lat, ssi, color}: AuroraOvalProps) {
-    const rings = useMemo(() => auroraRings(lat, ssi), [lat, ssi])
     return (
         <>
-            <Line points={rings.inner} color={color} lineWidth={6} transparent opacity={0.8}/>
-            <Line points={rings.outer} color={color} lineWidth={4} transparent opacity={0.3}/>
+            {rings.map((ring, i) => (
+                <Line
+                    key={i}
+                    points={ringAroundCentre(gmagCentre, Math.max(1, ring.colatDeg), ring.radius)}
+                    color={color}
+                    lineWidth={ring.lineWidth}
+                    transparent
+                    opacity={ring.opacity}
+                />
+            ))}
         </>
     )
 }
 
-// Component
+function SouthOval({auroralLatitudeDeg, ssi, color}: { auroralLatitudeDeg: number; ssi: number; color: string }) {
+    // SH oval uses geographic-latitude rings; geomagnetic pole geometry
+    // for the south is complex, and the geographic approach is visually reliable.
+    const glowBand = useMemo(() => buildGlowBand(ssi), [ssi])
 
-export default function AuroralMap({ssi, aLat, view}: Props) {
-    const [geoData, setGeoData] = useState<any>(null)
+    const rings = useMemo(() => {
+        // Negate auroralLatitudeDeg for southern latitudes.
+        const ovalCentreLat = -(auroralLatitudeDeg + 3.0 + ssi * 2)
+        return glowBand.map((ring: RingDef) => ({
+            ...ring,
+            // Poleward offsets decrease latitude (more negative), equatorward increase.
+            latDeg: ovalCentreLat - ring.offset,
+        }))
+    }, [auroralLatitudeDeg, ssi, glowBand])
+
+    return (
+        <>
+            {rings.map((ring, i) => (
+                <Line
+                    key={i}
+                    points={ringAtLatitude(ring.latDeg, ring.radius)}
+                    color={color}
+                    lineWidth={ring.lineWidth}
+                    transparent
+                    opacity={ring.opacity}
+                />
+            ))}
+        </>
+    )
+}
+
+/** 3D Earth globe with dynamic auroral ovals driven by SSI and auroral latitude. */
+export default function AuroralMap({ssi, auroralLatitudeDeg, view}: Props) {
+    const [geoData, setGeoData] = useState<GeoJSONData | null>(null)
 
     useEffect(() => {
-        fetch('/ne_50m_admin_0_map_units.json')
-            .then(r => r.json())
+        fetch('/merged.geojson')
+            .then(r => r.json() as Promise<GeoJSONData>)
             .then(setGeoData)
-            .catch(console.error)
+            .catch(() => {})
     }, [])
 
     const earthTexture = useMemo(
@@ -73,16 +99,8 @@ export default function AuroralMap({ssi, aLat, view}: Props) {
 
     const color = ssiColor(ssi, 1)
 
-    /*
-     * north/south: single oval, latitude sign determined by view.
-     * rect (global): both hemispheres shown simultaneously at ±aLat.
-     * The CountryOverlay also receives the correct lat(s) for its
-     * Gaussian highlight, so in global view we render two overlays.
-     */
-    const isGlobal = view === 'rect'
-    const northLat = aLat
-    const southLat = -aLat
-    const singleLat = view === 'south' ? southLat : northLat
+    const overlayHemisphere: 'north' | 'south' | 'both' =
+        view === 'north' ? 'north' : view === 'south' ? 'south' : 'both'
 
     return (
         <div style={{width: '100%', height: '100%', background: '#070b16'}}>
@@ -90,31 +108,25 @@ export default function AuroralMap({ssi, aLat, view}: Props) {
                 <ambientLight intensity={1.4}/>
                 <directionalLight position={[5, 3, 5]} intensity={1.8}/>
 
-                {/* Earth sphere */}
                 <mesh>
                     <sphereGeometry args={[2, 64, 64]}/>
                     <meshPhongMaterial map={earthTexture} shininess={10}/>
                 </mesh>
 
-                {isGlobal ? (
-                    <>
-                        <AuroraOval lat={northLat} ssi={ssi} color={color}/>
-                        <AuroraOval lat={southLat} ssi={ssi} color={color}/>
-                    </>
-                ) : (
-                    <AuroraOval lat={singleLat} ssi={ssi} color={color}/>
+                {(view === 'north' || view === 'rect') && (
+                    <NorthOval auroralLatitudeDeg={auroralLatitudeDeg} ssi={ssi} color={color}/>
+                )}
+                {(view === 'south' || view === 'rect') && (
+                    <SouthOval auroralLatitudeDeg={auroralLatitudeDeg} ssi={ssi} color={color}/>
                 )}
 
-                {geoData && isGlobal ? (
-                    <>
-                        <CountryOverlay geojson={geoData} color={color} aLat={northLat} view="north"/>
-                        <CountryOverlaySouth geojson={geoData} color={color} aLat={southLat}/>
-                    </>
-                ) : geoData && view === 'south' ? (
-                    <CountryOverlaySouth geojson={geoData} color={color} aLat={singleLat}/>
-                ) : geoData ? (
-                    <CountryOverlay geojson={geoData} color={color} aLat={singleLat} view={view}/>
-                ) : null}
+                {geoData && (
+                    <CountryOverlay
+                        geojson={geoData}
+                        ssi={ssi}
+                        hemisphere={overlayHemisphere}
+                    />
+                )}
 
                 <Stars radius={300} depth={50} count={12000} factor={6} fade/>
                 <OrbitControls enablePan={false} minDistance={2.4} maxDistance={9}/>

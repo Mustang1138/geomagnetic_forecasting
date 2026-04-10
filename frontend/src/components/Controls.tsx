@@ -1,5 +1,3 @@
-// Types
-
 type View = 'north' | 'south' | 'rect'
 
 interface Props {
@@ -11,8 +9,6 @@ interface Props {
     onView: (view: View) => void
 }
 
-// Constants
-
 const SPEEDS = [0.5, 1, 5] as const
 const VIEWS: { key: View; label: string }[] = [
     {key: 'north', label: 'North'},
@@ -20,24 +16,26 @@ const VIEWS: { key: View; label: string }[] = [
     {key: 'rect', label: 'Global'},
 ]
 
-// Component
-
+/** Playback speed and globe-view controls. */
 export default function Controls({playing, speed, view, onTogglePlay, onSpeed, onView}: Props) {
     return (
-        <div style={{display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap'}}>
-            {/* Play/pause gets a fixed width so the layout doesn't shift on label change */}
-            <button style={{minWidth: 60}} onClick={onTogglePlay}>
-                {playing ? 'Pause' : 'Play'}
+        <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+            <button style={{minWidth: 58}} onClick={onTogglePlay}>
+                {playing ? '⏸ Pause' : '▶ Play'}
             </button>
 
-            <span>Speed:</span>
+            <div className="vdivider"/>
+
+            <span style={{fontSize: 11, color: 'var(--text-3)', marginRight: 2}}>Speed</span>
             {SPEEDS.map(sp => (
                 <button key={sp} onClick={() => onSpeed(sp)} disabled={speed === sp}>
                     {sp}×
                 </button>
             ))}
 
-            <span style={{marginLeft: 8}}>View:</span>
+            <div className="vdivider"/>
+
+            <span style={{fontSize: 11, color: 'var(--text-3)', marginRight: 2}}>View</span>
             {VIEWS.map(v => (
                 <button key={v.key} onClick={() => onView(v.key)} disabled={view === v.key}>
                     {v.label}
