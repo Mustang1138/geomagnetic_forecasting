@@ -58,8 +58,7 @@ const styles = {
     ssiPill: (ssi: number) => ({
         fontFamily: 'var(--font-mono)',
         padding: '1px 8px',
-        borderRadius: 3,
-        background: ssiColor(ssi, 0.15),
+        background: ssiColor(ssi, 0.12),
         color: ssiColor(ssi),
         border: `1px solid ${ssiColor(ssi, 0.35)}`,
         fontSize: 11,

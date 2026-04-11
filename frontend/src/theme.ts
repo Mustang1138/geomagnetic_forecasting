@@ -1,12 +1,12 @@
 // CSS variables are not accessible from a 2D canvas context, so design tokens are duplicated here.
 export const CANVAS_COLOURS = {
-    bg:      '#060d1a',
-    surface: '#0b1525',
-    border:  '#192a42',
-    text:    '#d8e6f5',
-    text2:   '#7a9ab8',
-    text3:   '#3d5a78',
-    accent:  '#38bdf8',
+    bg:      '#0e0e0e',
+    surface: '#131313',
+    border:  '#282828',
+    text:    '#ffffff',
+    text2:   '#e0e0e0',
+    text3:   '#b0b0b0',
+    accent:  '#e0e0e0',
 } as const
 
 export const SEVERITY_BANDS = [

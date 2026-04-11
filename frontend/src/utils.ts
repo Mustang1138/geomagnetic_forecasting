@@ -1,5 +1,5 @@
 export const MODEL_META = [
-    {key: 'rf', label: 'Random Forest', color: '#38bdf8'},
+    {key: 'rf', label: 'Random Forest', color: '#60a5fa'},
     {key: 'lr', label: 'Linear Regression', color: '#a78bfa'},
     {key: 'ls', label: 'LSTM', color: '#34d399'},
     {key: 'gr', label: 'GRU', color: '#fb923c'},

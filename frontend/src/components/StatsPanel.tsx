@@ -44,32 +44,62 @@ export default function StatsPanel({snapshot, activeModel, onSelectModel}: Props
 
             <div className="section-hd">Storm Severity Index</div>
 
-            <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 34,
-                lineHeight: 1, fontWeight: 500,
-                color: ssiColor(snapshot.true),
-            }}>
-                {snapshot.true.toFixed(4)}
-            </div>
-            <div style={{fontSize: 13, color: ssiColor(snapshot.true), marginTop: 3}}>
-                {ssiLabel(snapshot.true)}
+            <div style={{display: 'flex', gap: 8, marginBottom: 8}}>
+
+                {/* Observed */}
+                <div style={{
+                    flex: 1, padding: '8px 10px',
+                    border: `1px solid ${ssiColor(snapshot.true, 0.4)}`,
+                    background: ssiColor(snapshot.true, 0.06),
+                }}>
+                    <div style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', marginBottom: 5}}>
+                        Observed
+                    </div>
+                    <div style={{fontSize: 26, lineHeight: 1, color: ssiColor(snapshot.true), fontVariantNumeric: 'tabular-nums'}}>
+                        {snapshot.true.toFixed(4)}
+                    </div>
+                    <div style={{fontSize: 11, color: ssiColor(snapshot.true), marginTop: 4}}>
+                        {ssiLabel(snapshot.true)}
+                    </div>
+                </div>
+
+                {/* Predicted */}
+                <div style={{
+                    flex: 1, padding: '8px 10px',
+                    border: `1px solid var(--border)`,
+                    background: 'var(--surface)',
+                }}>
+                    <div style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', marginBottom: 5}}>
+                        {activeLabel}
+                    </div>
+                    <div style={{fontSize: 26, lineHeight: 1, color: ssiColor(pred), fontVariantNumeric: 'tabular-nums'}}>
+                        {pred.toFixed(4)}
+                    </div>
+                    <div style={{fontSize: 11, color: ssiColor(pred), marginTop: 4}}>
+                        {ssiLabel(pred)}
+                    </div>
+                </div>
+
             </div>
 
-            <div style={{
-                height: 4, background: 'var(--border)',
-                borderRadius: 2, overflow: 'hidden',
-                margin: '8px 0 6px',
-            }}>
+            {/* Comparison bar */}
+            <div style={{height: 4, background: 'var(--border)', marginBottom: 4, position: 'relative'}}>
                 <div style={{
+                    position: 'absolute', left: 0, top: 0,
                     height: '100%', width: `${ssiPct}%`,
-                    background: ssiColor(snapshot.true), borderRadius: 2,
+                    background: ssiColor(snapshot.true),
+                    transition: 'width 0.25s ease',
+                }}/>
+                <div style={{
+                    position: 'absolute', left: 0, top: 0,
+                    height: '100%', width: `${Math.min(100, pred * 100)}%`,
+                    background: ssiColor(pred),
+                    opacity: 0.45,
                     transition: 'width 0.25s ease',
                 }}/>
             </div>
-
-            <div style={{fontSize: 11, color: 'var(--text-3)'}}>
-                {activeLabel} prediction:{' '}
-                <span style={{fontFamily: 'var(--font-mono)', color: 'var(--text-2)'}}>{pred.toFixed(4)}</span>
+            <div style={{fontSize: 10, color: 'var(--text-3)', marginBottom: 4}}>
+                Error: <span style={{color: 'var(--text-2)'}}>±{Math.abs(pred - snapshot.true).toFixed(4)}</span>
             </div>
 
             <div className="section-hd">Auroral Oval Boundary</div>

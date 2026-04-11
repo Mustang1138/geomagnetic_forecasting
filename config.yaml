@@ -94,7 +94,7 @@ training:
 
 # Data physical limits — used for outlier removal during preprocessing
 physical_limits:
-  bt: [ 0.0, 5.0 ]  # nT - |<B>|  (Bt)
+  bt: [ 0.0, 100.0 ]  # nT - |<B>|  (Bt)
   bz_gsm: [ -50, 50 ]  # nT - IMF Bz component
   speed: [ 200, 1200 ]  # km/s - Solar wind speed
   density: [ 0.1, 200 ]  # n/cc - Proton density

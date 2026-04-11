@@ -11,7 +11,7 @@ from src.utils import find_project_root, load_config
 # prediction, shifting their series forward relative to the baselines.
 TEMPORAL_OFFSET = 6
 
-DOWNSAMPLE_STEP = 6  # keep every Nth row to reduce API payload size
+DOWNSAMPLE_STEP = 2  # keep every Nth row to reduce API payload size
 
 
 def _get_paths() -> tuple[Path, Path]:

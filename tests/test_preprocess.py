@@ -28,12 +28,16 @@ def test_preprocess_shapes(tmp_path):
         output_dir=str(tmp_path / "processed"),
     )
 
-    assert summary["train_samples"] > 0
-    assert summary["val_samples"] > 0
-    assert summary["test_samples"] > 0
+    # Summary keys use the 'rows' suffix (e.g. 'train_rows') as produced by
+    # DataPreprocessor.run().
+    assert summary["train_rows"] > 0
+    assert summary["val_rows"] > 0
+    assert summary["test_rows"] > 0
 
-    X = np.load(tmp_path / "processed" / "X_train.npy")
-    y = np.load(tmp_path / "processed" / "y_train.npy")
+    # Sequence arrays are written with model-specific suffixes (e.g.
+    # X_train_lstm.npy) rather than the generic X_train.npy.
+    X = np.load(tmp_path / "processed" / "X_train_lstm.npy")
+    y = np.load(tmp_path / "processed" / "y_train_lstm.npy")
 
     assert X.ndim == 3  # (samples, timesteps, features)
     assert y.ndim == 2
