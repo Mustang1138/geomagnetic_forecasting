@@ -123,7 +123,11 @@ def compute_ablation_metrics() -> pd.DataFrame:
 
 
 def plot_skill_comparison(ablation_df: pd.DataFrame) -> None:
-    """Grouped bar chart: skill scores for 5-feature vs 4-feature (Dst-withheld)."""
+    """Grouped bar chart: skill scores for 5-feature vs 4-feature (Dst-withheld).
+
+    Uses the same per-model colour palette and seaborn-v0_8-whitegrid style as
+    the main evaluation plots. Solid fill = 5-feature; hatched = 4-feature (Dst withheld).
+    """
     if not MAIN_METRICS_CSV.exists():
         logger.warning(
             "Main experiment metrics not found at %s — "
@@ -131,18 +135,15 @@ def plot_skill_comparison(ablation_df: pd.DataFrame) -> None:
             "Skipping comparison plot.", MAIN_METRICS_CSV
         )
         return
+
+    from src.evaluation.plots import MODEL_COLOURS, MODEL_DISPLAY_NAMES
+    plt.style.use("seaborn-v0_8-whitegrid")
+
     main_df = pd.read_csv(MAIN_METRICS_CSV)
     persistence_rmse_main = main_df.loc[main_df["model"] == "persistence", "rmse"].values[0]
     main_df["skill_score"] = 1 - (main_df["rmse"] / persistence_rmse_main) ** 2
 
     model_order = ["random_forest", "linear_regression", "lstm", "gru", "persistence"]
-    labels = {
-        "random_forest": "RF",
-        "linear_regression": "LR",
-        "lstm": "LSTM",
-        "gru": "GRU",
-        "persistence": "Persistence",
-    }
 
     def _score(df: pd.DataFrame, model: str) -> float:
         row = df.loc[df["model"] == model, "skill_score"]
@@ -153,22 +154,29 @@ def plot_skill_comparison(ablation_df: pd.DataFrame) -> None:
 
     main_scores = [_score(main_df, m) for m in model_order]
     ablation_scores = [_score(ablation_df, m) for m in model_order]
+    colours = [MODEL_COLOURS.get(m, "#888888") for m in model_order]
+    x_labels = [MODEL_DISPLAY_NAMES.get(m, m) for m in model_order]
 
     x = np.arange(len(model_order))
     width = 0.35
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    ax.bar(x - width / 2, main_scores, width,
-           label="5-feature (Dst included)", color="#2196F3", alpha=0.85)
-    ax.bar(x + width / 2, ablation_scores, width,
-           label="4-feature (Dst withheld)", color="#FF9800", alpha=0.85)
+    # Solid bars — 5-feature (Dst included)
+    for i, (score, colour) in enumerate(zip(main_scores, colours)):
+        ax.bar(x[i] - width / 2, score, width, color=colour, alpha=0.9,
+               label="5-feature (Dst included)" if i == 0 else "_nolegend_")
+    # Hatched bars — 4-feature (Dst withheld)
+    for i, (score, colour) in enumerate(zip(ablation_scores, colours)):
+        ax.bar(x[i] + width / 2, score, width, color=colour, alpha=0.5,
+               hatch="///", edgecolor=colour,
+               label="4-feature (Dst withheld)" if i == 0 else "_nolegend_")
 
-    ax.axhline(0, color="black", linewidth=0.8, linestyle="--", label="Persistence threshold")
-    ax.set_ylabel("Skill Score SS = 1 − (RMSE / RMSE_persistence)²")
-    ax.set_title("Figure 6.15: Skill Score Comparison — 5-Feature vs Dst-Withheld Ablation")
+    ax.axhline(0, color="#1a1a1a", linewidth=0.8, linestyle="--", label="Persistence threshold")
+    ax.set_ylabel("Skill Score  SS = 1 − (RMSE / RMSE$_{persistence}$)²")
+    ax.set_title("Skill Score Comparison: 5-Feature (Dst included) vs Dst-Withheld Ablation")
     ax.set_xticks(x)
-    ax.set_xticklabels([labels[m] for m in model_order])
-    ax.legend()
+    ax.set_xticklabels(x_labels)
+    ax.legend(framealpha=0.9)
     ax.set_ylim(-0.3, 1.05)
     plt.tight_layout()
 
