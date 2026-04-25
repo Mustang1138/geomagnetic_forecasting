@@ -68,7 +68,10 @@ def evaluate_baseline_models(processed_dir: Path, results_dir: Path) -> None:
         plot_timeseries(y_true, y_pred, model_name, plots_dir / f"{model_name}_timeseries.png", colour=colour)
         plot_scatter(y_true, y_pred, model_name, plots_dir / f"{model_name}_scatter.png", colour=colour)
         plot_residuals(y_true, y_pred, model_name, plots_dir / f"{model_name}_residuals.png", colour=colour)
-        plot_residual_distribution(y_true, y_pred, model_name, plots_dir / f"{model_name}_residual_hist.png", colour=colour)
+        plot_residual_distribution(
+            y_true, y_pred, model_name,
+            plots_dir / f"{model_name}_residual_hist.png", colour=colour,
+        )
 
         if model_name == "random_forest":
             model_path = results_dir / "baselines" / "models" / "random_forest.pkl"
@@ -142,7 +145,10 @@ def evaluate_temporal_models(results_dir: Path) -> list[dict]:
         plot_timeseries(y_true, y_pred, model_name, plots_dir / f"{model_name}_timeseries.png", colour=colour)
         plot_scatter(y_true, y_pred, model_name, plots_dir / f"{model_name}_scatter.png", colour=colour)
         plot_residuals(y_true, y_pred, model_name, plots_dir / f"{model_name}_residuals.png", colour=colour)
-        plot_residual_distribution(y_true, y_pred, model_name, plots_dir / f"{model_name}_residual_hist.png", colour=colour)
+        plot_residual_distribution(
+            y_true, y_pred, model_name,
+            plots_dir / f"{model_name}_residual_hist.png", colour=colour,
+        )
 
     return metrics_rows
 

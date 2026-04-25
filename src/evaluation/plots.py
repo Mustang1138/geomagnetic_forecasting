@@ -88,7 +88,7 @@ def plot_model_ranking(metrics_df: pd.DataFrame, output_path: Path) -> None:
     """Save a bar chart ranking all models by RMSE (lower is better)."""
     df = metrics_df.sort_values("rmse").copy()
     colours = [MODEL_COLOURS.get(m, "#888888") for m in df["model"]]
-    labels  = [MODEL_DISPLAY_NAMES.get(m, m) for m in df["model"]]
+    labels = [MODEL_DISPLAY_NAMES.get(m, m) for m in df["model"]]
 
     fig, ax = plt.subplots(figsize=(8, 5))
     bars = ax.bar(labels, df["rmse"], color=colours)

@@ -47,11 +47,16 @@ def _mock_df(n: int = _N) -> pd.DataFrame:
 
 def _mock_metrics() -> list[dict]:
     return [
-        {"key": "rf", "model": "random_forest",     "label": "Random Forest",    "rmse": 0.05, "mae": 0.04, "r2": 0.80},
-        {"key": "lr", "model": "linear_regression",  "label": "Linear Regression","rmse": 0.07, "mae": 0.05, "r2": 0.70},
-        {"key": "ls", "model": "lstm",               "label": "LSTM",             "rmse": 0.04, "mae": 0.03, "r2": 0.85},
-        {"key": "gr", "model": "gru",                "label": "GRU",              "rmse": 0.04, "mae": 0.03, "r2": 0.84},
-        {"key": "pe", "model": "persistence",        "label": "Persistence",      "rmse": 0.10, "mae": 0.08, "r2": 0.50},
+        {"key": "rf", "model": "random_forest", "label": "Random Forest",
+         "rmse": 0.05, "mae": 0.04, "r2": 0.80},
+        {"key": "lr", "model": "linear_regression", "label": "Linear Regression",
+         "rmse": 0.07, "mae": 0.05, "r2": 0.70},
+        {"key": "ls", "model": "lstm", "label": "LSTM",
+         "rmse": 0.04, "mae": 0.03, "r2": 0.85},
+        {"key": "gr", "model": "gru", "label": "GRU",
+         "rmse": 0.04, "mae": 0.03, "r2": 0.84},
+        {"key": "pe", "model": "persistence", "label": "Persistence",
+         "rmse": 0.10, "mae": 0.08, "r2": 0.50},
     ]
 
 

@@ -60,12 +60,12 @@ def _make_dummy_dataset(path: Path, n: int = 50):
     # Generate synthetic data covering all five feature columns used by
     # BaselineTrainer.FEATURE_COLS: bt, bz_gsm, speed, density, dst.
     df = pd.DataFrame({
-        "bt":                   np.random.uniform(0, 30, n),   # IMF magnitude (nT)
-        "bz_gsm":               np.random.randn(n),            # IMF Bz (scaled)
-        "speed":                np.random.uniform(300, 800, n), # Solar wind speed (km/s)
-        "density":              np.random.uniform(1, 30, n),   # Proton density (cm⁻³)
-        "dst":                  np.random.uniform(-100, 10, n), # Dst index (nT)
-        "storm_severity_index": np.random.rand(n),             # SSI in [0, 1]
+        "bt": np.random.uniform(0, 30, n),              # IMF magnitude (nT)
+        "bz_gsm": np.random.randn(n),                   # IMF Bz (scaled)
+        "speed": np.random.uniform(300, 800, n),        # Solar wind speed (km/s)
+        "density": np.random.uniform(1, 30, n),         # Proton density (cm⁻³)
+        "dst": np.random.uniform(-100, 10, n),          # Dst index (nT)
+        "storm_severity_index": np.random.rand(n),      # SSI in [0, 1]
     })
 
     # Save to CSV (mimics preprocessed baseline data format)

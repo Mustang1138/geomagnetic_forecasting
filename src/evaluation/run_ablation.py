@@ -6,12 +6,19 @@ the Random Forest dominance observed in the main experiment.
 
 Outputs: data/processed/ablation/  and  outputs/ablation/
 """
+# E402 is suppressed file-wide: the matplotlib backend must be set via
+# os.environ before any import (including transitive ones) loads pyplot,
+# which forces non-import statements to appear before the rest of the
+# imports in this script.
+# flake8: noqa: E402
+
+import os
+
+os.environ.setdefault("MPLBACKEND", "Agg")
 
 import pickle
 from pathlib import Path
 
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd

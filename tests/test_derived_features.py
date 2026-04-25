@@ -236,8 +236,8 @@ def test_auroral_latitude_range():
     (0.15, "quiet"),    # upper edge of quiet band (right-inclusive for first bin)
     (0.16, "minor"),    # just above quiet threshold
     (0.30, "minor"),    # upper edge of minor band
-    (0.31, "moderate"), # just above minor threshold
-    (0.50, "moderate"), # upper edge of moderate band
+    (0.31, "moderate"),  # just above minor threshold
+    (0.50, "moderate"),  # upper edge of moderate band
     (0.51, "severe"),   # just above moderate threshold
     (0.75, "severe"),   # upper edge of severe band
     (0.76, "extreme"),  # just above severe threshold

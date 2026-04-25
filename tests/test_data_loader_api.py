@@ -18,7 +18,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from src.api.data_loader import (
-    DOWNSAMPLE_STEP,
     TEMPORAL_OFFSET,
     _load_pred,
     get_metrics,
@@ -50,9 +49,9 @@ def _write_metrics_csv(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame({
         "model": ["random_forest", "linear_regression", "lstm", "gru", "persistence"],
-        "rmse":  [0.050, 0.070, 0.040, 0.041, 0.100],
-        "mae":   [0.040, 0.050, 0.030, 0.031, 0.080],
-        "r2":    [0.800, 0.700, 0.850, 0.840, 0.500],
+        "rmse": [0.050, 0.070, 0.040, 0.041, 0.100],
+        "mae": [0.040, 0.050, 0.030, 0.031, 0.080],
+        "r2": [0.800, 0.700, 0.850, 0.840, 0.500],
     }).to_csv(path, index=False)
 
 
@@ -60,14 +59,14 @@ def _write_metrics_csv(path: Path) -> None:
 def dirs(tmp_path):
     """Full synthetic outputs + processed directory tree."""
     processed = tmp_path / "processed"
-    outputs   = tmp_path / "outputs"
+    outputs = tmp_path / "outputs"
 
     _write_meta_csv(processed / "test_meta.csv", _N)
 
-    _write_pred_csv(outputs / "temporal"  / "predictions" / "lstm_predictions.csv",                 _N_TEMPORAL)
-    _write_pred_csv(outputs / "temporal"  / "predictions" / "gru_predictions.csv",                  _N_TEMPORAL)
-    _write_pred_csv(outputs / "baselines" / "predictions" / "random_forest_test_predictions.csv",    _N)
-    _write_pred_csv(outputs / "baselines" / "predictions" / "linear_regression_test_predictions.csv",_N)
+    _write_pred_csv(outputs / "temporal" / "predictions" / "lstm_predictions.csv", _N_TEMPORAL)
+    _write_pred_csv(outputs / "temporal" / "predictions" / "gru_predictions.csv", _N_TEMPORAL)
+    _write_pred_csv(outputs / "baselines" / "predictions" / "random_forest_test_predictions.csv", _N)
+    _write_pred_csv(outputs / "baselines" / "predictions" / "linear_regression_test_predictions.csv", _N)
     _write_metrics_csv(outputs / "metrics_all_models.csv")
 
     return processed, outputs

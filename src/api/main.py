@@ -34,7 +34,6 @@ _DIST = Path(__file__).resolve().parents[3] / "frontend" / "dist"
 if _DIST.exists():
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
-
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
         return FileResponse(_DIST / "index.html")

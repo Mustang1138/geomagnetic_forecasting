@@ -136,7 +136,10 @@ def assign_storm_severity_class(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def estimate_auroral_latitude(df: pd.DataFrame) -> pd.DataFrame:
-    """Estimate the equatorward auroral oval boundary latitude from SSI; for visualisation only, not precise geophysical prediction."""
+    """Estimate the equatorward auroral oval boundary latitude from SSI.
+
+    For visualisation only, not precise geophysical prediction.
+    """
     df = df.copy()
 
     raw_auroral_latitude = 67.0 - 22.0 * df["storm_severity_index"]
