@@ -205,6 +205,7 @@ class Trainer:
             n_features=input_size,
             hidden_size=cfg.hidden_size,
             num_layers=cfg.num_layers,
+            dropout=cfg.dropout,
         ).to(self._device)
 
         criterion = nn.MSELoss()

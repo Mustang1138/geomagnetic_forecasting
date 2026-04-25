@@ -12,12 +12,18 @@ class LSTMRegressor(nn.Module):
             n_features: int,
             hidden_size: int = 64,
             num_layers: int = 1,
+            dropout: float = 0.0,
     ):
         super().__init__()
 
         self.n_features = n_features
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.dropout = dropout
+
+        # PyTorch ignores dropout when num_layers == 1 (it only applies between
+        # stacked layers); pass 0.0 in that case to silence the warning.
+        effective_dropout = dropout if num_layers > 1 else 0.0
 
         self.lstm = nn.LSTM(
             input_size=n_features,
@@ -25,6 +31,7 @@ class LSTMRegressor(nn.Module):
             num_layers=num_layers,
             # batch_first=True: input shape is (batch, seq_len, features).
             batch_first=True,
+            dropout=effective_dropout,
         )
 
         self.fc = nn.Linear(hidden_size, 1)
@@ -53,12 +60,16 @@ class GRURegressor(nn.Module):
             n_features: int,
             hidden_size: int = 64,
             num_layers: int = 1,
+            dropout: float = 0.0,
     ):
         super().__init__()
 
         self.n_features = n_features
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.dropout = dropout
+
+        effective_dropout = dropout if num_layers > 1 else 0.0
 
         self.gru = nn.GRU(
             input_size=n_features,
@@ -66,6 +77,7 @@ class GRURegressor(nn.Module):
             num_layers=num_layers,
             # batch_first=True: input shape is (batch, seq_len, features).
             batch_first=True,
+            dropout=effective_dropout,
         )
 
         self.fc = nn.Linear(hidden_size, 1)
