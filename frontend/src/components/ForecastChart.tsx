@@ -12,7 +12,8 @@ interface Props {
 
 function computeMaxSSI(data: ForecastData): number {
     const allSSI = MODEL_META.flatMap(m => data.models[m.key]?.ssi ?? [])
-    return Math.max(...allSSI, 0.05) * 1.1
+    const rfUpper = data.models.rf?.ssi_upper ?? []
+    return Math.max(...allSSI, ...rfUpper, 0.05) * 1.1
 }
 
 /** Canvas chart displaying all 5 model SSI forecasts over 28 steps. */
@@ -46,6 +47,23 @@ export default function ForecastChart({data, currentIdx, onSeek}: Props) {
             const effectiveMax = Math.min(max, maxV)
             ctx.fillStyle = color
             ctx.fillRect(pad, yi(effectiveMax), iW, yi(min) - yi(effectiveMax))
+        }
+
+        // Random Forest confidence-interval band, drawn beneath the model lines.
+        const rfForecast = data.models.rf
+        const rfLower = rfForecast?.ssi_lower
+        const rfUpper = rfForecast?.ssi_upper
+        if (rfLower && rfUpper && rfLower.length === rfUpper.length && rfLower.length > 0) {
+            const rfMeta = MODEL_META.find(m => m.key === 'rf')
+            const rfColor = rfMeta?.color ?? 'rgb(232,118,33)'
+            ctx.beginPath()
+            rfUpper.forEach((v, i) => i === 0 ? ctx.moveTo(xi(i), yi(v)) : ctx.lineTo(xi(i), yi(v)))
+            for (let i = rfLower.length - 1; i >= 0; i--) ctx.lineTo(xi(i), yi(rfLower[i]))
+            ctx.closePath()
+            ctx.fillStyle = rfColor.startsWith('#')
+                ? `${rfColor}33`
+                : rfColor.replace('rgb(', 'rgba(').replace(')', ',0.2)')
+            ctx.fill()
         }
 
         MODEL_META.forEach(({key, color}) => {

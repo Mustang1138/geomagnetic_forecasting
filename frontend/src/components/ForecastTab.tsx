@@ -133,6 +133,10 @@ export default function ForecastTab() {
     const currentSSI = data.models[activeModel]?.ssi[currentIdx] ?? 0
     const currentDt  = data.timestamps[currentIdx] ?? '—'
     const snapshot   = buildSnapshot(data, activeModel, currentIdx)
+    const activeForecast = data.models[activeModel]
+    const ciLower = activeForecast?.ssi_lower?.[currentIdx]
+    const ciUpper = activeForecast?.ssi_upper?.[currentIdx]
+    const ciLevel = activeForecast?.ci_level
 
     return (
         <div style={styles.root}>
@@ -170,6 +174,14 @@ export default function ForecastTab() {
                     <span style={styles.ssiPill(currentSSI)}>
                         {ssiLabel(currentSSI)} · {currentSSI.toFixed(4)}
                     </span>
+                    {ciLower !== undefined && ciUpper !== undefined && (
+                        <span style={{
+                            fontFamily: 'var(--font-mono)', fontSize: 11,
+                            color: 'var(--text-3)',
+                        }}>
+                            {Math.round((ciLevel ?? 0.9) * 100)}% CI [{ciLower.toFixed(4)}, {ciUpper.toFixed(4)}]
+                        </span>
+                    )}
                     <span style={styles.tlIdx}>{currentIdx + 1} / {data.steps}</span>
                 </div>
 

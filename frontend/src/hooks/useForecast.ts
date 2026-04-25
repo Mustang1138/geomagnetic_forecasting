@@ -5,6 +5,9 @@ export interface ModelForecast {
     ssi: number[]
     auroral_lat: number[]
     storm_class: string[]
+    ssi_lower?: number[]
+    ssi_upper?: number[]
+    ci_level?: number
 }
 
 export interface ForecastData {

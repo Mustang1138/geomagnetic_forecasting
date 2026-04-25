@@ -15,6 +15,7 @@ from src.features.derived_features import (
     compute_storm_severity_index,
     estimate_auroral_latitude,
 )
+from src.models.rf_quantile import predict_with_ci
 from src.models.temporal_model import GRURegressor, LSTMRegressor
 from src.preprocessing.preprocess import FEATURE_COLS
 from src.preprocessing.realtime_pipeline import build_seed_window
@@ -100,6 +101,34 @@ def _forecast_sklearn(
         current_row = future_conditions[step].reshape(1, -1)
 
     return predictions
+
+
+def _forecast_rf_with_ci(
+        rf_model,
+        seed_window: np.ndarray,
+        future_conditions: np.ndarray,
+        n_steps: int,
+        quantiles: tuple[float, float] = (0.05, 0.95),
+) -> tuple[list[float], list[float], list[float]]:
+    """Run the autoregressive loop for RF and return per-step 90 % quantile bounds.
+
+    Returns ``(mean_predictions, lower_bounds, upper_bounds)``. The mean
+    predictions are identical to those from ``_forecast_sklearn`` for the same
+    RF model, ensuring the point-estimate series is unchanged.
+    """
+    current_row = seed_window[-1].reshape(1, -1)
+    means: list[float] = []
+    lowers: list[float] = []
+    uppers: list[float] = []
+
+    for step in range(n_steps):
+        mean_pred, lower, upper = predict_with_ci(rf_model, current_row, quantiles)
+        means.append(float(mean_pred[0]))
+        lowers.append(float(lower[0]))
+        uppers.append(float(upper[0]))
+        current_row = future_conditions[step].reshape(1, -1)
+
+    return means, lowers, uppers
 
 
 def _forecast_temporal(
@@ -217,11 +246,13 @@ def generate_forecast() -> Optional[dict]:
         n_features, config, "gru",
     )
 
+    rf_model = load_pickle(outputs_dir / "baselines" / "models" / "random_forest.pkl")
+    rf_mean, rf_lower, rf_upper = _forecast_rf_with_ci(
+        rf_model, seed_window, future_conditions, FORECAST_STEPS,
+    )
+
     raw_forecasts = {
-        "rf": _forecast_sklearn(
-            load_pickle(outputs_dir / "baselines" / "models" / "random_forest.pkl"),
-            seed_window, future_conditions, FORECAST_STEPS,
-        ),
+        "rf": rf_mean,
         "lr": _forecast_sklearn(
             load_pickle(outputs_dir / "baselines" / "models" / "linear_regression.pkl"),
             seed_window, future_conditions, FORECAST_STEPS,
@@ -231,15 +262,25 @@ def generate_forecast() -> Optional[dict]:
         "pe": _forecast_persistence(seed_window, scaler_X, scaler_y, FORECAST_STEPS),
     }
 
+    rf_ci_bounds = {
+        "lower": _inverse_scale_predictions(rf_lower, scaler_y),
+        "upper": _inverse_scale_predictions(rf_upper, scaler_y),
+    }
+
     models_output = {}
     for model_key, scaled_preds in raw_forecasts.items():
         ssi_values = _inverse_scale_predictions(scaled_preds, scaler_y)
         auroral_lats, storm_classes = _derive_forecast_metadata(ssi_values)
-        models_output[model_key] = {
+        entry = {
             "ssi": ssi_values,
             "auroral_lat": auroral_lats,
             "storm_class": storm_classes,
         }
+        if model_key == "rf":
+            entry["ssi_lower"] = rf_ci_bounds["lower"]
+            entry["ssi_upper"] = rf_ci_bounds["upper"]
+            entry["ci_level"] = 0.90
+        models_output[model_key] = entry
 
     logger.info("Forecast generated successfully (%d steps).", FORECAST_STEPS)
 
