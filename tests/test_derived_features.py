@@ -17,6 +17,7 @@ References:
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.features.derived_features import (
     compute_storm_severity_index,
@@ -226,3 +227,72 @@ def test_auroral_latitude_range():
     # Verify upper bound (quiet conditions)
     assert lat.max() <= 67.0, \
         f"Maximum auroral latitude ({lat.max():.2f}°) exceeds 67.0°"
+
+
+# ── Severity class boundary conditions ───────────────────────────────────────
+
+@pytest.mark.parametrize("ssi, expected_class", [
+    (0.00, "quiet"),    # minimum — first bin is [0.0, 0.15] (include_lowest=True)
+    (0.15, "quiet"),    # upper edge of quiet band (right-inclusive for first bin)
+    (0.16, "minor"),    # just above quiet threshold
+    (0.30, "minor"),    # upper edge of minor band
+    (0.31, "moderate"), # just above minor threshold
+    (0.50, "moderate"), # upper edge of moderate band
+    (0.51, "severe"),   # just above moderate threshold
+    (0.75, "severe"),   # upper edge of severe band
+    (0.76, "extreme"),  # just above severe threshold
+    (1.00, "extreme"),  # maximum SSI
+])
+def test_severity_class_at_boundaries(ssi, expected_class):
+    """
+    Verify that the correct storm severity class is assigned at and around
+    each threshold value (0.15, 0.30, 0.50, 0.75).
+
+    Off-by-epsilon errors at class boundaries are a common failure mode in
+    binning logic; testing exact boundary values ensures the pd.cut
+    configuration (include_lowest, right-inclusive bins) behaves as intended.
+    """
+    df = assign_storm_severity_class(pd.DataFrame({"storm_severity_index": [ssi]}))
+    result = str(df["storm_severity_class"].iloc[0])
+    assert result == expected_class, (
+        f"SSI {ssi:.2f}: expected class '{expected_class}', got '{result}'"
+    )
+
+
+# ── Custom SSI weights ────────────────────────────────────────────────────────
+
+def test_ssi_invalid_weights_raises_value_error():
+    """Weights that do not sum to 1.0 should raise ValueError."""
+    df = _make_fake_df(10)
+    with pytest.raises(ValueError):
+        compute_storm_severity_index(df, weights=(0.5, 0.5, 0.0, 0.0, 0.1))  # sums to 1.1
+
+
+def test_ssi_custom_valid_weights_produces_bounded_output():
+    """Any valid weight set should still produce SSI values in [0, 1]."""
+    df = _make_fake_df(10)
+    result = compute_storm_severity_index(df, weights=(0.40, 0.30, 0.15, 0.10, 0.05))
+    ssi = result["storm_severity_index"]
+    assert ssi.between(0.0, 1.0).all()
+
+
+# ── Northward Bz contribution ─────────────────────────────────────────────────
+
+def test_northward_bz_produces_lower_ssi_than_southward():
+    """
+    Northward (positive) Bz should be clipped to zero and contribute nothing
+    to the SSI; southward (negative) Bz should produce a higher SSI.
+
+    This validates the physical logic that only southward IMF drives ring-current
+    injection and geomagnetic storm development.
+    """
+    base = {"bt": [0.0], "speed": [300.0], "density": [1.0], "dst": [0.0]}
+    df_north = pd.DataFrame({**base, "bz_gsm": [10.0]})   # strongly northward
+    df_south = pd.DataFrame({**base, "bz_gsm": [-10.0]})  # strongly southward
+
+    ssi_north = compute_storm_severity_index(df_north)["storm_severity_index"].iloc[0]
+    ssi_south = compute_storm_severity_index(df_south)["storm_severity_index"].iloc[0]
+
+    assert ssi_north < ssi_south, (
+        f"Southward Bz should produce higher SSI: north={ssi_north:.4f}, south={ssi_south:.4f}"
+    )
