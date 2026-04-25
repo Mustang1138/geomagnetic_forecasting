@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from src.evaluation.plots import (
+    MODEL_COLOURS,
     plot_feature_importance,
     plot_model_ranking,
     plot_residual_distribution,
@@ -63,10 +64,11 @@ def evaluate_baseline_models(processed_dir: Path, results_dir: Path) -> None:
         metrics["model"] = model_name
         metrics_rows.append(metrics)
 
-        plot_timeseries(y_true, y_pred, model_name, plots_dir / f"{model_name}_timeseries.png")
-        plot_scatter(y_true, y_pred, model_name, plots_dir / f"{model_name}_scatter.png")
-        plot_residuals(y_true, y_pred, model_name, plots_dir / f"{model_name}_residuals.png")
-        plot_residual_distribution(y_true, y_pred, model_name, plots_dir / f"{model_name}_residual_hist.png")
+        colour = MODEL_COLOURS.get(model_name)
+        plot_timeseries(y_true, y_pred, model_name, plots_dir / f"{model_name}_timeseries.png", colour=colour)
+        plot_scatter(y_true, y_pred, model_name, plots_dir / f"{model_name}_scatter.png", colour=colour)
+        plot_residuals(y_true, y_pred, model_name, plots_dir / f"{model_name}_residuals.png", colour=colour)
+        plot_residual_distribution(y_true, y_pred, model_name, plots_dir / f"{model_name}_residual_hist.png", colour=colour)
 
         if model_name == "random_forest":
             model_path = results_dir / "baselines" / "models" / "random_forest.pkl"
@@ -101,8 +103,9 @@ def evaluate_baseline_models(processed_dir: Path, results_dir: Path) -> None:
         metrics["model"] = "persistence"
         metrics_rows.append(metrics)
 
-        plot_timeseries(y_true, y_pred, "persistence", plots_dir / "persistence_timeseries.png")
-        plot_scatter(y_true, y_pred, "persistence", plots_dir / "persistence_scatter.png")
+        colour = MODEL_COLOURS.get("persistence")
+        plot_timeseries(y_true, y_pred, "persistence", plots_dir / "persistence_timeseries.png", colour=colour)
+        plot_scatter(y_true, y_pred, "persistence", plots_dir / "persistence_scatter.png", colour=colour)
 
     metrics_df = pd.DataFrame(metrics_rows)
     # Ensure 'model' is the first column so that callers reading the CSV with
@@ -135,10 +138,11 @@ def evaluate_temporal_models(results_dir: Path) -> list[dict]:
         metrics["model"] = model_name
         metrics_rows.append(metrics)
 
-        plot_timeseries(y_true, y_pred, model_name, plots_dir / f"{model_name}_timeseries.png")
-        plot_scatter(y_true, y_pred, model_name, plots_dir / f"{model_name}_scatter.png")
-        plot_residuals(y_true, y_pred, model_name, plots_dir / f"{model_name}_residuals.png")
-        plot_residual_distribution(y_true, y_pred, model_name, plots_dir / f"{model_name}_residual_hist.png")
+        colour = MODEL_COLOURS.get(model_name)
+        plot_timeseries(y_true, y_pred, model_name, plots_dir / f"{model_name}_timeseries.png", colour=colour)
+        plot_scatter(y_true, y_pred, model_name, plots_dir / f"{model_name}_scatter.png", colour=colour)
+        plot_residuals(y_true, y_pred, model_name, plots_dir / f"{model_name}_residuals.png", colour=colour)
+        plot_residual_distribution(y_true, y_pred, model_name, plots_dir / f"{model_name}_residual_hist.png", colour=colour)
 
     return metrics_rows
 
