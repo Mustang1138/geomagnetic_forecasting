@@ -6,49 +6,44 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.venv/
 venv/
 env/
 ENV/
 
-# PyCharm
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/usage.statistics.xml
-.idea/shelf/
+# PyCharm / IDE
+.idea/
 *.iml
-
-# Data (don't commit large datasets)
-/data/
-
-
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb
 
 # OS
 .DS_Store
 Thumbs.db
 .directory
 
-# Models / artefacts
-*.npy
-*.pth
-*.pkl
-*.h5
-outputs/baselines/models
-checkpoints/
+# Project folders not committed to GitHub
+/data/
+/docs/
+/logs/
+/outputs/
+
+# Frontend build output and dependencies
+frontend/node_modules/
+frontend/dist/
+
+# Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Test / coverage artefacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
 
 # Logs
 *.log
-logs/
 
-# Pytest
-.pytest_cache/
-
-# Temporary files
+# Temporary / scratch
 *.tmp
 *.bak
 *~
-
-# Results and Trained Models
-/outputs/
