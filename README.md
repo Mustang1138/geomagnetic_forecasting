@@ -37,8 +37,14 @@ all models are trained and evaluated under identical conditions with no data lea
 - Temporal deep learning: LSTM and GRU regressors (PyTorch), trained on 6-hourly sequences
 - Physics-informed Storm Severity Index (SSI) target: composite [0, 1] score from Bz, Bt, solar wind speed,
   density, and Dst, computed at hourly resolution **before** resampling to preserve storm peaks
-- Hyperparameter optimisation via Optuna (`tune.py`)
-- Comprehensive evaluation: RMSE, MAE, R², residual analysis, feature importance, model ranking chart
+- Hyperparameter optimisation via Optuna (`tune.py`); tuned values committed to `config.yaml`
+- Random Forest **90 % prediction intervals** from per-tree quantile aggregation (Meinshausen 2006), exposed
+  via the API and rendered as a CI band in the forecast view
+- Comprehensive evaluation: RMSE, MAE, R², skill score, residual analysis, feature importance, model ranking
+- **Statistical significance testing**: pairwise Diebold–Mariano with Harvey small-sample correction
+- **Stratified analysis**: per-SSI-class skill score against a class-restricted persistence baseline
+- **Ablation study**: 4-feature (Dst-withheld) re-training to quantify Dst's marginal contribution
+- Dissertation figures regenerated end-to-end with `python -m src.evaluation.figures`
 
 ### Interactive Web Application
 
@@ -80,11 +86,11 @@ geomagnetic_forecasting/
 │   │       ├── models.py             # GET /api/models
 │   │       └── forecast_route.py     # GET /api/forecast
 │   ├── data/
-│   │   ├── data_loader.py            # Downloads OMNI2 annual files
+│   │   ├── data_fetcher.py           # Downloads OMNI2 annual files
 │   │   ├── data_sources.py           # HTTP clients (OMNI2, DSCOVR)
 │   │   ├── build_aurora_lookup.py    # Builds country visibility index
 │   │   ├── sequence_datasets.py      # Sliding-window sequence builder
-│   │   └── torch_datasets.py        # PyTorch Dataset wrappers
+│   │   └── torch_datasets.py         # PyTorch Dataset wrappers
 │   ├── preprocessing/
 │   │   ├── prepare_data.py           # Pipeline entry point
 │   │   ├── preprocess.py             # DataPreprocessor class
@@ -96,6 +102,7 @@ geomagnetic_forecasting/
 │   │   ├── baseline_models.py        # Linear Regression, Random Forest
 │   │   ├── temporal_model.py         # LSTMRegressor, GRURegressor (PyTorch)
 │   │   ├── persistence.py            # Last-value baseline
+│   │   ├── rf_quantile.py            # RF prediction intervals from estimators_
 │   │   └── training/
 │   │       ├── train_baselines.py
 │   │       ├── train_lstm.py
@@ -104,8 +111,19 @@ geomagnetic_forecasting/
 │   │       └── tune.py               # Optuna hyperparameter search
 │   ├── evaluation/
 │   │   ├── evaluate.py               # Evaluation orchestrator
-│   │   ├── plots.py                  # Matplotlib plotting functions
-│   │   └── validators.py             # Preprocessed data validation
+│   │   ├── plots.py                  # Per-model plots and shared palette
+│   │   ├── dm_test.py                # Pairwise Diebold–Mariano significance
+│   │   ├── stratified_metrics.py     # Per-SSI-class skill scoring
+│   │   ├── run_ablation.py           # 4-feature Dst-withheld experiment
+│   │   ├── validators.py             # Preprocessed data validation
+│   │   └── figures/                  # Dissertation figure generators
+│   │       ├── __main__.py           # `python -m src.evaluation.figures`
+│   │       ├── _common.py            # Paths, palette, prediction loaders
+│   │       ├── main_results.py       # Headline test-set figures
+│   │       ├── storm_window.py       # Storm-epoch detail figures
+│   │       ├── diagnostics.py        # SSI ACF, Dst-vs-SSI, class distribution
+│   │       ├── significance.py       # DM heatmap, stratified skill bars
+│   │       └── loss_curves.py        # LSTM/GRU train/val loss curves
 │   └── utils.py                      # Shared utilities (logging, config, I/O)
 │
 ├── frontend/
@@ -170,7 +188,7 @@ All routes are served under `/api`.
 | GET    | `/api/predictions?model=KEY` | Full test-set time series for one model (`rf`, `lr`, `ls`, `gr`, `pe`) |
 | GET    | `/api/snapshot?idx=N`        | Single-timestep snapshot of all model predictions   |
 | GET    | `/api/models`                | Available models with evaluation metrics            |
-| GET    | `/api/forecast`              | Live 7-day forecast from current DSCOVR conditions  |
+| GET    | `/api/forecast`              | Live 7-day forecast from current DSCOVR conditions; the `rf` entry includes 90 % prediction-interval bounds |
 
 In production, the compiled React SPA (`frontend/dist/`) is served directly by the FastAPI application.
 
@@ -211,6 +229,14 @@ python -m src.models.training.tune
 # Evaluate all models → outputs/
 python -m src.evaluation.evaluate
 
+# (Optional) Run the Dst-withheld ablation, significance tests, and stratified metrics
+python -m src.evaluation.run_ablation
+python -m src.evaluation.dm_test
+python -m src.evaluation.stratified_metrics
+
+# Regenerate the dissertation figure set → outputs/
+python -m src.evaluation.figures
+
 # Build the country aurora visibility index (one-time, run after evaluation)
 python -m src.data.build_aurora_lookup
 ```
@@ -238,6 +264,9 @@ npm run lint       # ESLint
 ---
 
 ## Testing
+
+The repository ships with 122 tests covering preprocessing, derived features, every model, the evaluation
+pipeline, the API routes, the autoregressive forecast engine, and the real-time DSCOVR pipeline.
 
 ```bash
 # All tests
