@@ -11,7 +11,7 @@ logger = setup_logging()
 
 
 def kp_to_auroral_lat(kp: pd.Series) -> pd.Series:
-    """Convert Kp index to equatorward auroral boundary using the NOAA SWPC formula (lat = 66 - 2*Kp)."""
+    """Convert Kp index to equatorward auroral boundary via NOAA SWPC's lat = 66 − 2·Kp."""
     return 66.0 - 2.0 * kp
 
 

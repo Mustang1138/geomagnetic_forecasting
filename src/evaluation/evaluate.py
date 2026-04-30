@@ -65,9 +65,18 @@ def evaluate_baseline_models(processed_dir: Path, results_dir: Path) -> None:
         metrics_rows.append(metrics)
 
         colour = MODEL_COLOURS.get(model_name)
-        plot_timeseries(y_true, y_pred, model_name, plots_dir / f"{model_name}_timeseries.png", colour=colour)
-        plot_scatter(y_true, y_pred, model_name, plots_dir / f"{model_name}_scatter.png", colour=colour)
-        plot_residuals(y_true, y_pred, model_name, plots_dir / f"{model_name}_residuals.png", colour=colour)
+        plot_timeseries(
+            y_true, y_pred, model_name,
+            plots_dir / f"{model_name}_timeseries.png", colour=colour,
+        )
+        plot_scatter(
+            y_true, y_pred, model_name,
+            plots_dir / f"{model_name}_scatter.png", colour=colour,
+        )
+        plot_residuals(
+            y_true, y_pred, model_name,
+            plots_dir / f"{model_name}_residuals.png", colour=colour,
+        )
         plot_residual_distribution(
             y_true, y_pred, model_name,
             plots_dir / f"{model_name}_residual_hist.png", colour=colour,
@@ -107,8 +116,14 @@ def evaluate_baseline_models(processed_dir: Path, results_dir: Path) -> None:
         metrics_rows.append(metrics)
 
         colour = MODEL_COLOURS.get("persistence")
-        plot_timeseries(y_true, y_pred, "persistence", plots_dir / "persistence_timeseries.png", colour=colour)
-        plot_scatter(y_true, y_pred, "persistence", plots_dir / "persistence_scatter.png", colour=colour)
+        plot_timeseries(
+            y_true, y_pred, "persistence",
+            plots_dir / "persistence_timeseries.png", colour=colour,
+        )
+        plot_scatter(
+            y_true, y_pred, "persistence",
+            plots_dir / "persistence_scatter.png", colour=colour,
+        )
 
     metrics_df = pd.DataFrame(metrics_rows)
     # Ensure 'model' is the first column so that callers reading the CSV with
@@ -142,9 +157,18 @@ def evaluate_temporal_models(results_dir: Path) -> list[dict]:
         metrics_rows.append(metrics)
 
         colour = MODEL_COLOURS.get(model_name)
-        plot_timeseries(y_true, y_pred, model_name, plots_dir / f"{model_name}_timeseries.png", colour=colour)
-        plot_scatter(y_true, y_pred, model_name, plots_dir / f"{model_name}_scatter.png", colour=colour)
-        plot_residuals(y_true, y_pred, model_name, plots_dir / f"{model_name}_residuals.png", colour=colour)
+        plot_timeseries(
+            y_true, y_pred, model_name,
+            plots_dir / f"{model_name}_timeseries.png", colour=colour,
+        )
+        plot_scatter(
+            y_true, y_pred, model_name,
+            plots_dir / f"{model_name}_scatter.png", colour=colour,
+        )
+        plot_residuals(
+            y_true, y_pred, model_name,
+            plots_dir / f"{model_name}_residuals.png", colour=colour,
+        )
         plot_residual_distribution(
             y_true, y_pred, model_name,
             plots_dir / f"{model_name}_residual_hist.png", colour=colour,

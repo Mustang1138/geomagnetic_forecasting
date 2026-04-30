@@ -10,7 +10,9 @@ VALID_MODELS = {"rf", "lr", "ls", "gr", "pe"}
 
 
 @router.get("/predictions")
-def get_predictions(model: str = Query(default="rf", description="Model key: rf | lr | ls | gr | pe")):
+def get_predictions(
+    model: str = Query(default="rf", description="Model key: rf | lr | ls | gr | pe"),
+):
     """Return columnar prediction arrays for compact transfer."""
     if model not in VALID_MODELS:
         raise HTTPException(400, detail=f"Unknown model '{model}'. Valid: {sorted(VALID_MODELS)}")

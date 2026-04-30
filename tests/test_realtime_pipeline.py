@@ -153,7 +153,8 @@ def test_resample_to_6hourly_reduces_row_count():
 
 def test_apply_physical_limits_clips_above_max():
     df = pd.DataFrame({"bt": [200.0], "speed": [2000.0]})
-    result = apply_physical_limits(df, {"physical_limits": {"bt": [0.0, 100.0], "speed": [200.0, 1200.0]}})
+    limits = {"physical_limits": {"bt": [0.0, 100.0], "speed": [200.0, 1200.0]}}
+    result = apply_physical_limits(df, limits)
     assert result["bt"].iloc[0] <= 100.0
     assert result["speed"].iloc[0] <= 1200.0
 

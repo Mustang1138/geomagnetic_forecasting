@@ -183,7 +183,7 @@ def _derive_forecast_metadata(ssi_values: list[float]) -> tuple[list[float], lis
 
 
 def _generate_timestamps(n_steps: int) -> list[str]:
-    """Generate ISO-format timestamps for each forecast step, starting at the next 6-hour boundary."""
+    """Generate ISO-format timestamps for each step, starting at the next 6-hour boundary."""
     now = datetime.utcnow()
     hours_ahead = STEP_HOURS - (now.hour % STEP_HOURS)
     start = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=hours_ahead)
@@ -257,8 +257,12 @@ def generate_forecast() -> Optional[dict]:
             load_pickle(outputs_dir / "baselines" / "models" / "linear_regression.pkl"),
             seed_window, future_conditions, FORECAST_STEPS,
         ),
-        "ls": _forecast_temporal(lstm_model, seed_window[-lstm_seq_len:], future_conditions, FORECAST_STEPS),
-        "gr": _forecast_temporal(gru_model, seed_window[-gru_seq_len:], future_conditions, FORECAST_STEPS),
+        "ls": _forecast_temporal(
+            lstm_model, seed_window[-lstm_seq_len:], future_conditions, FORECAST_STEPS,
+        ),
+        "gr": _forecast_temporal(
+            gru_model, seed_window[-gru_seq_len:], future_conditions, FORECAST_STEPS,
+        ),
         "pe": _forecast_persistence(seed_window, scaler_X, scaler_y, FORECAST_STEPS),
     }
 

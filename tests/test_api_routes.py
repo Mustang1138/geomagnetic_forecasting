@@ -170,7 +170,8 @@ def test_models_all_keys_present():
 # ── GET /api/forecast ─────────────────────────────────────────────────────────
 
 def test_forecast_success():
-    with patch("src.api.routes.forecast_route.generate_forecast", return_value=_mock_forecast_result()):
+    mock_target = "src.api.routes.forecast_route.generate_forecast"
+    with patch(mock_target, return_value=_mock_forecast_result()):
         response = client.get("/api/forecast")
     assert response.status_code == 200
     body = response.json()
@@ -188,7 +189,8 @@ def test_forecast_returns_503_when_dscovr_unavailable():
 
 def test_forecast_model_payload_shape():
     """Each model's payload should contain ssi, auroral_lat, and storm_class arrays."""
-    with patch("src.api.routes.forecast_route.generate_forecast", return_value=_mock_forecast_result()):
+    mock_target = "src.api.routes.forecast_route.generate_forecast"
+    with patch(mock_target, return_value=_mock_forecast_result()):
         body = client.get("/api/forecast").json()
     for model_key in _VALID_MODELS:
         payload = body["models"][model_key]

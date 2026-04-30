@@ -63,10 +63,12 @@ def dirs(tmp_path):
 
     _write_meta_csv(processed / "test_meta.csv", _N)
 
-    _write_pred_csv(outputs / "temporal" / "predictions" / "lstm_predictions.csv", _N_TEMPORAL)
-    _write_pred_csv(outputs / "temporal" / "predictions" / "gru_predictions.csv", _N_TEMPORAL)
-    _write_pred_csv(outputs / "baselines" / "predictions" / "random_forest_test_predictions.csv", _N)
-    _write_pred_csv(outputs / "baselines" / "predictions" / "linear_regression_test_predictions.csv", _N)
+    baselines_pred = outputs / "baselines" / "predictions"
+    temporal_pred = outputs / "temporal" / "predictions"
+    _write_pred_csv(temporal_pred / "lstm_predictions.csv", _N_TEMPORAL)
+    _write_pred_csv(temporal_pred / "gru_predictions.csv", _N_TEMPORAL)
+    _write_pred_csv(baselines_pred / "random_forest_test_predictions.csv", _N)
+    _write_pred_csv(baselines_pred / "linear_regression_test_predictions.csv", _N)
     _write_metrics_csv(outputs / "metrics_all_models.csv")
 
     return processed, outputs

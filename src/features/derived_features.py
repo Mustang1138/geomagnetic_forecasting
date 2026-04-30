@@ -61,6 +61,9 @@ def compute_storm_severity_index(
 ) -> pd.DataFrame:
     """Compute a continuous Storm Severity Index (SSI) in [0, 1].
 
+    See REFERENCES.md for the SSI weighting rationale and §3.4 of the
+    project report for the physics-informed bounds and weight derivation.
+
     Parameters
     ----------
     df : pd.DataFrame
@@ -106,6 +109,9 @@ def compute_storm_severity_index(
 
 def assign_storm_severity_class(df: pd.DataFrame) -> pd.DataFrame:
     """Assign categorical storm severity labels based on SSI.
+
+    Class boundaries (Quiet/Minor/Moderate/Severe/Extreme) are documented
+    in §3.4 of the project report and REFERENCES.md.
 
     Parameters
     ----------
