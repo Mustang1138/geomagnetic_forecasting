@@ -1,8 +1,10 @@
 # Geomagnetic Forecasting - Machine Learning Evaluation & Visualisation Platform
 
-A controlled research study evaluating whether temporal deep learning models (LSTM, GRU) provide measurable
-performance improvements over classical baselines for geomagnetic activity forecasting, extended with an
-interactive 3D auroral visualisation web application.
+A reproducible, leakage-controlled comparison study of machine-learning models for short-horizon geomagnetic
+storm-severity prediction, extended with an interactive 3D auroral visualisation web application. Under
+controlled conditions, temporal sequence architectures provide no measurable forecasting advantage: Random
+Forest achieves R² = 0.97 and a skill score of 0.91, whilst LSTM and GRU perform within measurement error of
+the trivial persistence baseline.
 
 ---
 
@@ -20,8 +22,9 @@ interactive 3D auroral visualisation web application.
 
 ## Research Question
 
-> Do temporal sequence models (LSTM, GRU) meaningfully improve geomagnetic forecasting performance compared to
-> classical baselines under controlled preprocessing conditions?
+> Do temporal sequence architectures (LSTM, GRU) provide a measurable forecasting advantage over classical
+> regression baselines (Random Forest, Linear Regression, Persistence) for 6-hourly geomagnetic storm-severity
+> prediction under strictly controlled, leakage-free experimental conditions?
 
 The project prioritises **methodological fairness**, **reproducibility**, and **scientific validity**, ensuring
 all models are trained and evaluated under identical conditions with no data leakage.
@@ -257,8 +260,6 @@ API available at `http://127.0.0.1:8000`.
 cd frontend
 npm install
 npm run dev        # Dev server at http://localhost:5173
-npm run build      # Production build → frontend/dist/ (served by FastAPI)
-npm run lint       # ESLint
 ```
 
 ---
@@ -298,12 +299,6 @@ DSCOVR inference pipeline. Changing this setting (`resample_6h` in `config.yaml`
 
 ---
 
-## References
-
-See [REFERENCES.md](REFERENCES.md) for the full bibliography.
-
----
-
 ## Acknowledgements
 
 - Prof. Ella Pereira - Project Supervisor, Edge Hill University
@@ -313,4 +308,4 @@ See [REFERENCES.md](REFERENCES.md) for the full bibliography.
 
 ---
 
-*Last updated: April 2026*
+*Last updated: May 2026*
